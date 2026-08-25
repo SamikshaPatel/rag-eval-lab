@@ -173,6 +173,35 @@ python3 src/rag_chain.py "What is the capital of France?"   # out-of-corpus test
 **If the answer hallucinates on the France question:** The grounding prompt is
 not working as intended — this is worth investigating before moving on.
 
+**Verify in LangSmith (if you set up the key in Step 4)**
+
+1. Go to https://smith.langchain.com
+2. **Projects** in the left sidebar → open **rag-eval-lab**
+3. Click the trace for the question you just ran
+
+You'll see the pipeline broken down step by step:
+```
+▶ RunnableSequence
+  ├── retrieve          → the 3 chunks fetched from chroma_db
+  ├── ChatPromptTemplate → the grounding prompt with context filled in
+  ├── ChatOllama        → LLM call (input: full prompt, output: the answer)
+  └── StrOutputParser   → final text
+```
+
+**What to look for in the trace:**
+- **retrieve** step — did the right chunks come back? Wrong chunks = wrong answer, regardless of the LLM
+- **ChatOllama** step — shows the exact prompt the model saw and its raw response
+- Latency column — shows which step is the bottleneck (usually the LLM call)
+
+**If no traces appear:** confirm your env vars loaded correctly:
+```bash
+source .env && echo $LANGSMITH_API_KEY   # should print your ls__... key
+```
+If blank, re-run the script with the env loaded first:
+```bash
+source .env && source .venv/bin/activate && python3 src/rag_chain.py "How much does the Pro plan cost?"
+```
+
 ---
 
 ## Step 7 — Test the agent (`agent.py`)
