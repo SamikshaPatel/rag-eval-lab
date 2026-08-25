@@ -1,9 +1,9 @@
-# RAG + Agent + Eval Lab — a fully free learning project
+# RAG + Agent + Eval Lab — a fully local learning project
 
 One tiny project that combines **Step 5 (RAG)**, **Step 6 (Agents & tool use)**,
-and **Step 7 (Evaluation)** from your AI-testing plan. Every tool is free and
-runs on your own machine — no API bills, no cloud keys except an optional free
-LangSmith account.
+and **Step 7 (Evaluation)** from your AI-testing plan. RAG and agents run
+entirely on your machine. Evaluation uses **Gemini 2.5 Flash** as the LLM judge
+(free API key required) and an optional free LangSmith account for tracing.
 
 The thing you are really learning: **how to test a system that gives a
 different answer every time you run it.** That is the discipline that separates
@@ -14,16 +14,16 @@ testing instincts transfer directly.
 
 ## The free stack
 
-| Layer           | Tool                | Cost | Role in the project |
-|-----------------|---------------------|------|--------------|
-| Local LLM       | **Ollama** (llama3.1) | Free | Generation + LLM-as-judge |
-| LLM as Judge    | **Gemini 2.5 Flash  | Free | LLM-as-judge |
-| Embeddings      | **nomic-embed-text** | Free | Turns text into vectors |
-| Vector store    | **Chroma**          | Free | Stores + searches vectors, on disk |
-| Orchestration   | **LangChain**       | Free | Wires the RAG pipeline |
-| Agent framework | **LangGraph**       | Free | The decision-making loop |
-| Tracing         | **LangSmith**       | Free tier | See each step of a run |
-| Eval library    | **RAGAS**           | Free | RAG triad metrics |
+| Layer           | Tool                    | Cost      | Role in the project |
+|-----------------|-------------------------|-----------|---------------------|
+| Local LLM       | **Ollama** (llama3.1)   | Free      | Generation (RAG + agent) |
+| Embeddings      | **nomic-embed-text**    | Free      | Turns text into vectors |
+| Vector store    | **Chroma**              | Free      | Stores + searches vectors, on disk |
+| Orchestration   | **LangChain**           | Free      | Wires the RAG pipeline |
+| Agent framework | **LangGraph**           | Free      | The decision-making loop |
+| **LLM judge**   | **Gemini 2.5 Flash**    | Free tier | Grades answers in eval_custom + RAGAS |
+| Tracing         | **LangSmith**           | Free tier | See each step of a run (optional) |
+| Eval library    | **RAGAS**               | Free      | RAG triad metrics |
 
 ---
 
@@ -72,8 +72,9 @@ Read the files in this order. Each one is heavily commented with the "why".
 
 ## Suggested learning path (about a week, an hour a day)
 
-1. **Day 1** — Do `SETUP.md`. Run `ingest.py`. Open the `chroma_db` folder and
-   confirm something was written. You now have a searchable knowledge base.
+1. **Day 1** — Do `SETUP.md`. Copy `.env.example` to `.env` and add your
+   `GOOGLE_API_KEY` (free at aistudio.google.com). Run `ingest.py` and confirm
+   `chroma_db/` was written. You now have a searchable knowledge base.
 2. **Day 2** — Run `rag_chain.py` with several questions. Then open the run in
    LangSmith and read the retrieve → prompt → generate trace.
 3. **Day 3** — Break it on purpose: set `chunk_size=100` in `ingest.py`,
