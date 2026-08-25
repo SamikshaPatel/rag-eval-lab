@@ -95,10 +95,13 @@ judge = ChatGoogleGenerativeAI(model=JUDGE_MODEL, temperature=0)
 
 
 def llm_judge(answer, contexts) -> bool:
-    verdict = judge.invoke(
+    content = judge.invoke(
         JUDGE_PROMPT.format(context="\n\n".join(contexts), answer=answer)
-    ).content.strip().upper()
-    return verdict.startswith("PASS")
+    ).content
+    # Gemini SDK may return content as a list of parts; extract text field
+    if isinstance(content, list):
+        content = " ".join(p.get("text", str(p)) if isinstance(p, dict) else str(p) for p in content)
+    return content.strip().upper().startswith("PASS")
 
 
 # ---------------------------------------------------------------------------
