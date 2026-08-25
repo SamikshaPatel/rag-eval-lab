@@ -13,7 +13,7 @@ Before anything else, confirm your tools are in place.
 
 ```bash
 ollama --version          # should print a version number
-python --version          # should be 3.10+
+python3 --version          # should be 3.10+
 gh --version              # optional, only needed if you want to push to GitHub
 ```
 
@@ -68,7 +68,7 @@ ollama list
 ## Step 3 — Python environment
 
 ```bash
-python -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate       # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
@@ -78,7 +78,7 @@ pip install -r requirements.txt
 
 **Verify:**
 ```bash
-python -c "import langchain, ragas, langgraph; print('OK')"
+python3 -c "import langchain, ragas, langgraph; print('OK')"
 # should print: OK
 ```
 
@@ -116,7 +116,7 @@ authentication error when they try to call the Gemini judge.
 ## Step 5 — Build the vector store (`ingest.py`)
 
 ```bash
-python src/ingest.py
+python3 src/ingest.py
 ```
 
 **What happens inside:**
@@ -150,13 +150,13 @@ Reset to 400 when done.
 ## Step 6 — Test the RAG pipeline (`rag_chain.py`)
 
 ```bash
-python src/rag_chain.py "How much does the Pro plan cost?"
+python3 src/rag_chain.py "How much does the Pro plan cost?"
 ```
 
 Try a few questions:
 ```bash
-python src/rag_chain.py "What is the API rate limit on the Pro plan?"
-python src/rag_chain.py "What is the capital of France?"   # out-of-corpus test
+python3 src/rag_chain.py "What is the API rate limit on the Pro plan?"
+python3 src/rag_chain.py "What is the capital of France?"   # out-of-corpus test
 ```
 
 **What to expect:**
@@ -178,9 +178,9 @@ not working as intended — this is worth investigating before moving on.
 ## Step 7 — Test the agent (`agent.py`)
 
 ```bash
-python src/agent.py "What is the API rate limit on the Pro plan?"
-python src/agent.py "What is 2 + 2?"
-python src/agent.py "I need 90 extra days of retention. What will it cost?"
+python3 src/agent.py "What is the API rate limit on the Pro plan?"
+python3 src/agent.py "What is 2 + 2?"
+python3 src/agent.py "I need 90 extra days of retention. What will it cost?"
 ```
 
 **What to expect:**
@@ -204,7 +204,7 @@ need to be clearer — this is itself a lesson in how tool docstrings drive rout
 ## Step 8 — Hand-rolled evaluation (`eval_custom.py`)
 
 ```bash
-python src/eval_custom.py
+python3 src/eval_custom.py
 ```
 
 **What happens inside:**
@@ -251,7 +251,7 @@ run proves nothing.
 ## Step 9 — RAGAS evaluation (`eval_ragas.py`)
 
 ```bash
-python src/eval_ragas.py
+python3 src/eval_ragas.py
 ```
 
 **What happens inside:**

@@ -10,7 +10,7 @@ An educational project teaching RAG (Retrieval-Augmented Generation), Agents, an
 
 ```bash
 # One-time setup
-python -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 
@@ -18,11 +18,11 @@ pip install -r requirements.txt
 # Pull required models: ollama pull llama3.1:8b && ollama pull nomic-embed-text
 
 # Run in order
-python src/ingest.py                        # Build vector store (run once, or after changing data/chunking)
-python src/rag_chain.py "Your question"     # Test RAG pipeline
-python src/agent.py "Multi-step question"   # Test agent tool routing
-python src/eval_custom.py                   # Run hand-rolled eval harness
-python src/eval_ragas.py                    # Run RAGAS evaluation
+python3 src/ingest.py                        # Build vector store (run once, or after changing data/chunking)
+python3 src/rag_chain.py "Your question"     # Test RAG pipeline
+python3 src/agent.py "Multi-step question"   # Test agent tool routing
+python3 src/eval_custom.py                   # Run hand-rolled eval harness
+python3 src/eval_ragas.py                    # Run RAGAS evaluation
 
 # Required for eval: copy .env.example → .env and add GOOGLE_API_KEY (Gemini judge)
 # Optional: also add LangSmith keys for tracing
