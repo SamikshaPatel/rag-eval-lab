@@ -27,8 +27,10 @@ Run (after ingest.py):  python src/eval_ragas.py
 
 import json
 from langchain_ollama import OllamaEmbeddings
+import os
 from langchain_google_genai import ChatGoogleGenerativeAI
-from rag_chain import answer_with_context, JUDGE_MODEL, EMBED_MODEL
+from langchain_ollama import ChatOllama
+from rag_chain import answer_with_context, JUDGE_MODEL, LOCAL_JUDGE_MODEL, EMBED_MODEL
 
 # RAGAS 0.2.x imports. If these fail, check `pip show ragas` — the API changed
 # across versions. Your hand-rolled eval_custom.py is the version-proof backup.
@@ -65,12 +67,19 @@ def build_dataset():
 def main():
     dataset = build_dataset()
 
-    # Point RAGAS at Gemini 2.5 Flash as the judge model.
-    evaluator_llm = LangchainLLMWrapper(ChatGoogleGenerativeAI(model=JUDGE_MODEL, temperature=0))
+    # USE_LOCAL_JUDGE=1 in .env uses Ollama instead of Gemini (free, no quota).
+    if os.getenv("USE_LOCAL_JUDGE") == "1":
+        print(f"[judge] Using local Ollama model: {LOCAL_JUDGE_MODEL}")
+        _llm = ChatOllama(model=LOCAL_JUDGE_MODEL, temperature=0)
+    else:
+        print(f"[judge] Using Gemini: {JUDGE_MODEL}")
+        _llm = ChatGoogleGenerativeAI(model=JUDGE_MODEL, temperature=0)
+    evaluator_llm = LangchainLLMWrapper(_llm)
     evaluator_emb = LangchainEmbeddingsWrapper(OllamaEmbeddings(model=EMBED_MODEL))
 
-    # Longer timeout + no parallelism helps local models survive the run.
-    run_config = RunConfig(timeout=180, max_workers=1)
+    # Longer timeout + no parallelism helps the judge model survive the run.
+    # 600s per call accommodates slow Gemini responses under rate limits.
+    run_config = RunConfig(timeout=600, max_workers=1)
 
     result = evaluate(
         dataset=dataset,

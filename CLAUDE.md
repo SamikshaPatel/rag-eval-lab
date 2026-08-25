@@ -23,8 +23,11 @@ python3 src/rag_chain.py "Your question"     # Test RAG pipeline
 python3 src/agent.py "Multi-step question"   # Test agent tool routing
 python3 src/eval_custom.py                   # Run hand-rolled eval harness
 python3 src/eval_ragas.py                    # Run RAGAS evaluation
+USE_LOCAL_JUDGE=1 python3 src/eval_deepeval.py  # Run DeepEval (local Ollama judge)
+python3 src/eval_deepeval.py                 # Run DeepEval (Gemini judge)
 
 # Required for eval: copy .env.example → .env and add GOOGLE_API_KEY (Gemini judge)
+# Optional: add USE_LOCAL_JUDGE=1 to .env to use Ollama when Gemini quota is exhausted
 # Optional: also add LangSmith keys for tracing
 ```
 
@@ -38,7 +41,7 @@ data/zephyr_handbook.md
     → ingest.py (chunk + embed)
     → chroma_db/ (persisted vector store)
     → rag_chain.py (retrieve + generate)
-    → eval_custom.py / eval_ragas.py (evaluate)
+    → eval_custom.py / eval_ragas.py / eval_deepeval.py (evaluate)
          ↑ also tested via agent.py (tool routing)
 ```
 
@@ -52,7 +55,9 @@ data/zephyr_handbook.md
 
 **`src/eval_custom.py`** — Hand-rolled eval harness measuring: retrieval hit rate, keyword correctness, abstention (hallucination test), and LLM-as-judge (Gemini 2.5 Flash via `ChatGoogleGenerativeAI`). The `REPEATS` parameter (default 1) controls multi-run variance measurement.
 
-**`src/eval_ragas.py`** — RAGAS evaluation using Gemini 2.5 Flash as the judge via `LangchainLLMWrapper(ChatGoogleGenerativeAI(...))`. Computes faithfulness, answer relevancy, context precision, and context recall. Embeddings still use local Ollama (`nomic-embed-text`).
+**`src/eval_ragas.py`** — RAGAS evaluation using `gemini-3.6-flash` as the judge via `LangchainLLMWrapper(ChatGoogleGenerativeAI(...))`. Computes faithfulness, answer relevancy, context precision, and context recall. Embeddings still use local Ollama (`nomic-embed-text`). Set `USE_LOCAL_JUDGE=1` to use Ollama instead.
+
+**`src/eval_deepeval.py`** — DeepEval evaluation: same four metrics as RAGAS but pytest-style (each question is an `LLMTestCase`). Makes fewer LLM sub-calls per metric than RAGAS. Judge is `gemini-3.6-flash` by default; set `USE_LOCAL_JUDGE=1` to fall back to `llama3.1:8b` via `OllamaModel`. Baseline results (local judge): Contextual Precision 0.83, Answer Relevancy 0.83, Faithfulness 0.58, Contextual Recall 0.51.
 
 ### Golden Dataset
 
@@ -63,5 +68,5 @@ data/zephyr_handbook.md
 - **Fictional corpus**: Forces retrieval dependency; model cannot rely on training data
 - **Temperature=0**: Reduces variance in generation for more reproducible evals
 - **`answer_with_context()`**: Returns contexts alongside answers—RAGAS and custom eval both need the retrieved chunks, not just the final answer
-- **Gemini 2.5 Flash as judge**: Both `eval_custom.py` and `eval_ragas.py` use `JUDGE_MODEL = "gemini-2.5-flash"` (defined in `rag_chain.py`) via `ChatGoogleGenerativeAI`. Requires `GOOGLE_API_KEY` in `.env`. Ollama is still used for RAG generation and embeddings; only the judge role uses Gemini.
+- **Gemini 3.6 Flash as judge**: All three eval scripts (`eval_custom.py`, `eval_ragas.py`, `eval_deepeval.py`) use `JUDGE_MODEL = "gemini-3.6-flash"` (defined in `rag_chain.py`) via `ChatGoogleGenerativeAI`. Requires `GOOGLE_API_KEY` in `.env`. Free tier is 20 req/day — set `USE_LOCAL_JUDGE=1` in `.env` to fall back to `LOCAL_JUDGE_MODEL = "llama3.1:8b"` via Ollama when quota is exhausted. Ollama is always used for RAG generation and embeddings; only the judge role uses Gemini.
 - **Calculator whitelist**: `re.fullmatch(r'[\d\s\+\-\*/\(\)\.]+', expression)` prevents code injection via the tool

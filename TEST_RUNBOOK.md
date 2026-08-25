@@ -217,7 +217,7 @@ observed why single-run AI testing is unreliable.
 
 ## TR-07 — RAGAS Evaluation (`eval_ragas.py`)
 
-*(Step 9 — to be run and documented)*
+*(Pending — blocked by Gemini free-tier quota; run tomorrow)*
 
 **Command:**
 ```bash
@@ -241,3 +241,119 @@ context_recall
 **Cross-check:** Compare `faithfulness` against the LLM-judge score from TR-06.
 They measure the same thing with different methods. If they agree, the signal
 is reliable. If they disagree by more than 15%, investigate which one is wrong.
+
+---
+
+## TR-08 — DeepEval Evaluation (`eval_deepeval.py`)
+
+**Command (local judge — no quota needed):**
+```bash
+USE_LOCAL_JUDGE=1 python3 src/eval_deepeval.py
+```
+
+**Command (Gemini judge — requires quota):**
+```bash
+python3 src/eval_deepeval.py
+```
+
+**Judge model used for baseline below:** `llama3.1:8b` (local Ollama)
+Set `USE_LOCAL_JUDGE=1` in `.env` to use local judge when Gemini free-tier
+quota (20 req/day for `gemini-3.6-flash`) is exhausted.
+
+**Actual results — baseline run (local judge `llama3.1:8b`, 2026-08-25):**
+
+```
+[out] abstention=Y (OK) :: What is Zephyr Analytics' stock price?
+[out] abstention=Y (OK) :: Who is the CEO of Zephyr Analytics?
+
+[FAIL] How many dashboards does the Free plan include?
+       ✓ Faithfulness                 1.00
+       ✓ Answer Relevancy             1.00
+       ✗ Contextual Recall            0.50
+       ✓ Contextual Precision         0.83
+
+[FAIL] How much does the Pro plan cost per seat per month?
+       ✗ Faithfulness                 0.50
+       ✓ Answer Relevancy             1.00
+       ✗ Contextual Recall            0.50
+       ✓ Contextual Precision         0.83
+
+[FAIL] Which plans include the Pulse feature?
+       ✓ Faithfulness                 1.00
+       ✗ Answer Relevancy             0.50
+       ✗ Contextual Recall            0.50
+       ✓ Contextual Precision         0.83
+
+[FAIL] What is the API rate limit on the Pro plan?
+       ✗ Faithfulness                 0.00
+       ✓ Answer Relevancy             1.00
+       ✗ Contextual Recall            0.50
+       ✓ Contextual Precision         0.83
+
+[FAIL] How long is data retained on the Free plan?
+       ✗ Faithfulness                 0.50
+       ✓ Answer Relevancy             1.00
+       ✗ Contextual Recall            0.57
+       ✓ Contextual Precision         0.83
+
+[FAIL] In which cities does Zephyr run its data centres?
+       ✗ Faithfulness                 0.50
+       ✗ Answer Relevancy             0.50
+       ✗ Contextual Recall            0.50
+       ✓ Contextual Precision         0.83
+```
+
+**Baseline scores (local judge):**
+
+| Metric | Avg Score | Pass Rate | Threshold | Status |
+|--------|-----------|-----------|-----------|--------|
+| Faithfulness | 0.58 | 2/6 | 0.7 | ⚠ Below threshold |
+| Answer Relevancy | 0.83 | 4/6 | 0.7 | ⚠ 2 questions miss |
+| Contextual Recall | 0.51 | 0/6 | 0.7 | ❌ Consistent gap |
+| Contextual Precision | 0.83 | 6/6 | 0.7 | ✅ |
+| Abstention | 2/2 = 100% | — | — | ✅ |
+
+**What these scores reveal:**
+
+| Finding | Implication |
+|---------|-------------|
+| Contextual Precision 0.83 across all questions | Retriever fetches relevant chunks — no noise problem |
+| Contextual Recall 0.51 across all questions | Retriever consistently misses some needed facts — primary bottleneck |
+| Faithfulness 0.58 | `llama3.1:8b` adds embellishments beyond the context; tighter prompt may help |
+| Abstention 100% | Grounding holds — no hallucination on out-of-corpus questions |
+
+**Root cause of low Contextual Recall:** Retriever fetches k=3 chunks.
+Facts needed for full answers sometimes span more than 3 chunks.
+Try raising `k` in [`src/rag_chain.py`](src/rag_chain.py) from 3 → 5.
+
+**Note on local vs Gemini judge:** `llama3.1:8b` is a weaker judge than
+Gemini — scores may be noisier and thresholds harder to pass. Re-run with
+Gemini judge to get the authoritative baseline (see pending task below).
+
+---
+
+## PENDING — Re-run TR-08 with Gemini Judge
+
+**Status:** ⏳ Blocked — Gemini free-tier quota (`gemini-3.6-flash`, 20 req/day)
+exhausted on 2026-08-25. Quota resets daily.
+
+**Action (run on 2026-08-26 or later):**
+```bash
+python3 src/eval_deepeval.py
+```
+
+**What to do after running:**
+1. Fill in the Gemini-judge scores in the table below
+2. Compare Faithfulness score against TR-06 LLM-judge (83%) — if they agree
+   within 15%, the signal is reliable
+3. Update the "baseline" note in TR-08 to reflect the Gemini run
+
+**Gemini-judge results (to be filled in):**
+
+| Metric | Avg Score | Pass Rate | Status |
+|--------|-----------|-----------|--------|
+| Faithfulness | — | — | — |
+| Answer Relevancy | — | — | — |
+| Contextual Recall | — | — | — |
+| Contextual Precision | — | — | — |
+| Abstention | — | — | — |

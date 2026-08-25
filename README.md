@@ -21,9 +21,10 @@ testing instincts transfer directly.
 | Vector store    | **Chroma**              | Free      | Stores + searches vectors, on disk |
 | Orchestration   | **LangChain**           | Free      | Wires the RAG pipeline |
 | Agent framework | **LangGraph**           | Free      | The decision-making loop |
-| **LLM judge**   | **Gemini 2.5 Flash**    | Free tier | Grades answers in eval_custom + RAGAS |
+| **LLM judge**   | **Gemini 3.6 Flash**    | Free tier (20 req/day) | Grades answers in eval_custom, RAGAS, DeepEval |
 | Tracing         | **LangSmith**           | Free tier | See each step of a run (optional) |
 | Eval library    | **RAGAS**               | Free      | RAG triad metrics |
+| Eval library    | **DeepEval**            | Free      | Pytest-style RAG metrics, fewer LLM calls than RAGAS |
 
 ---
 
@@ -62,10 +63,12 @@ Read the files in this order. Each one is heavily commented with the "why".
 | **Abstention / hallucination test** | `src/eval_custom.py` | Out-of-corpus questions *must* get "I don't know" |
 | **LLM-as-judge** | `src/eval_custom.py` | A model grades a model — powerful, but it can be confidently wrong |
 | **Pass rates vs single runs** | `src/eval_custom.py` | Set `REPEATS=3` and watch scores wobble — the core reason AI testing differs |
-| **Faithfulness** | `src/eval_ragas.py` | Formal grounding metric = your hallucination test, standardised |
-| **Answer relevancy** | `src/eval_ragas.py` | Does the answer address the question asked? |
-| **Context precision** | `src/eval_ragas.py` | Retriever *noise* — too much junk fetched |
-| **Context recall** | `src/eval_ragas.py` | Retriever *misses* — needed facts not fetched |
+| **Faithfulness** | `src/eval_ragas.py` / `src/eval_deepeval.py` | Formal grounding metric = your hallucination test, standardised |
+| **Answer relevancy** | `src/eval_ragas.py` / `src/eval_deepeval.py` | Does the answer address the question asked? |
+| **Context precision** | `src/eval_ragas.py` / `src/eval_deepeval.py` | Retriever *noise* — too much junk fetched |
+| **Context recall** | `src/eval_ragas.py` / `src/eval_deepeval.py` | Retriever *misses* — needed facts not fetched |
+| **Eval framework trade-offs** | `src/eval_deepeval.py` vs `src/eval_ragas.py` | Same metrics, different frameworks — compare pass rates to understand tool variance |
+| **Local vs cloud judge** | `eval_deepeval.py` (`USE_LOCAL_JUDGE=1`) | When Gemini quota runs out, Ollama judge shows quality vs cost trade-off |
 | **Tracing / observability** | any script + LangSmith | For agents, the trace is the only way to tell a lucky answer from a correct process |
 
 ---
@@ -85,7 +88,11 @@ Read the files in this order. Each one is heavily commented with the "why".
    `REPEATS=3` and observe variance.
 6. **Day 6** — Run `eval_ragas.py`. Line its scores up against your hand-rolled
    numbers. Where they disagree, figure out who is right.
-7. **Day 7** — Add three of your own questions to `golden_qa.json`, including
+7. **Day 7** — Run `eval_deepeval.py`. Compare the same four metrics produced
+   by a different framework against your RAGAS scores. If Gemini quota is
+   exhausted, set `USE_LOCAL_JUDGE=1` and run with the local model — then
+   compare judge quality as a bonus lesson.
+8. **Day 8** — Add three of your own questions to `golden_qa.json`, including
    one more out-of-corpus trap. You have now authored an eval suite.
 
 ---

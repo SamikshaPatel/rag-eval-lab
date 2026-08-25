@@ -26,8 +26,10 @@ Run:  python src/eval_custom.py
 """
 
 import json
+import os
 from langchain_google_genai import ChatGoogleGenerativeAI
-from rag_chain import answer_with_context, JUDGE_MODEL
+from langchain_ollama import ChatOllama
+from rag_chain import answer_with_context, JUDGE_MODEL, LOCAL_JUDGE_MODEL
 
 REPEATS = 1   # bump to 3 to see run-to-run variance (recommended once it works)
 
@@ -91,7 +93,13 @@ ANSWER:
 
 Verdict (PASS or FAIL):"""
 
-judge = ChatGoogleGenerativeAI(model=JUDGE_MODEL, temperature=0)
+# USE_LOCAL_JUDGE=1 in .env uses Ollama (free, no quota) instead of Gemini.
+if os.getenv("USE_LOCAL_JUDGE") == "1":
+    judge = ChatOllama(model=LOCAL_JUDGE_MODEL, temperature=0)
+    print(f"[judge] Using local Ollama model: {LOCAL_JUDGE_MODEL}")
+else:
+    judge = ChatGoogleGenerativeAI(model=JUDGE_MODEL, temperature=0)
+    print(f"[judge] Using Gemini: {JUDGE_MODEL}")
 
 
 def llm_judge(answer, contexts) -> bool:

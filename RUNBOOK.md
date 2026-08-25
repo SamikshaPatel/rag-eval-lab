@@ -244,7 +244,7 @@ Runs all 8 golden questions through the RAG chain and measures 4 metrics:
 | Retrieval hit rate | Did the retriever fetch a chunk containing the answer? |
 | Keyword correctness | Does the answer contain the expected keywords? |
 | Abstention | Did the model say "I don't know" for out-of-corpus questions? |
-| LLM-as-judge | Does Gemini 2.5 Flash grade the answer as faithful to the context? |
+| LLM-as-judge | Does the judge model (Gemini 3.6 Flash or local Ollama) grade the answer as faithful to the context? |
 
 **What to expect:**
 ```
@@ -308,11 +308,60 @@ investigate — one of the two methods is wrong, and figuring out which one is a
 real testing skill.
 
 **If you see `NaN`:** Check that `GOOGLE_API_KEY` is set and you haven't hit
-the free-tier rate limit. Re-run after a minute.
+the free-tier rate limit (20 req/day for `gemini-3.6-flash`). Re-run after a
+minute, or set `USE_LOCAL_JUDGE=1` in `.env` to fall back to Ollama.
 
 ---
 
-## Step 10 — Extend the golden dataset
+## Step 10 — DeepEval evaluation (`eval_deepeval.py`)
+
+```bash
+USE_LOCAL_JUDGE=1 python3 src/eval_deepeval.py   # local Ollama judge (free, no quota)
+python3 src/eval_deepeval.py                      # Gemini judge (requires quota)
+```
+
+**What happens inside:**
+Runs the same in-corpus questions through DeepEval — a pytest-style eval
+framework. Uses the same four metrics as RAGAS but makes fewer LLM sub-calls
+per metric, so it is faster and less likely to exhaust the Gemini free tier.
+
+| Metric | What it checks |
+|--------|---------------|
+| Faithfulness | Answer grounded in retrieved context? |
+| Answer Relevancy | Answer actually addresses the question? |
+| Contextual Recall | Context covers all facts in the reference answer? |
+| Contextual Precision | Retrieved chunks are on-topic? |
+
+**Judge selection:**
+- Default: `gemini-3.6-flash` via `GOOGLE_API_KEY` (20 req/day free tier)
+- Fallback: set `USE_LOCAL_JUDGE=1` in `.env` to use `llama3.1:8b` locally
+
+**What to expect (local judge baseline):**
+```
+===== SUMMARY =====
+Faithfulness          avg: 0.58  pass: 2/6  (threshold: 0.7)
+Answer Relevancy      avg: 0.83  pass: 4/6  (threshold: 0.7)
+Contextual Recall     avg: 0.51  pass: 0/6  (threshold: 0.7)
+Contextual Precision  avg: 0.83  pass: 6/6  (threshold: 0.7)
+Abstention (no hallucination): 2/2 = 100%
+```
+
+**What you are learning:**
+- The same four metrics can be computed by different frameworks — compare
+  DeepEval scores against RAGAS scores; if they disagree significantly,
+  investigate whether the framework or the judge is the variable
+- Local vs cloud judge quality is a real trade-off: `llama3.1:8b` produces
+  noisier scores than Gemini, especially for faithfulness
+- Contextual Recall < 0.7 across all questions points to a retrieval gap —
+  try raising `k` from 3 → 5 in `rag_chain.py`
+
+**If all tests FAIL at 0% pass rate:**
+The local judge is not following DeepEval's structured output format reliably.
+Re-run with the Gemini judge (when quota allows) for authoritative scores.
+
+---
+
+## Step 11 — Extend the golden dataset
 
 Open `eval/golden_qa.json` and add at least three new entries:
 
@@ -335,5 +384,6 @@ that transfers to every AI system you will test in the future.
 | `ingest.py` | `data/zephyr_handbook.md`, Ollama running | — |
 | `rag_chain.py` | `chroma_db/` (run ingest first) | Ollama running |
 | `agent.py` | `chroma_db/` (run ingest first) | Ollama running |
-| `eval_custom.py` | `chroma_db/`, `eval/golden_qa.json` | Ollama + `GOOGLE_API_KEY` |
-| `eval_ragas.py` | `chroma_db/`, `eval/golden_qa.json` | Ollama + `GOOGLE_API_KEY` |
+| `eval_custom.py` | `chroma_db/`, `eval/golden_qa.json` | Ollama + `GOOGLE_API_KEY` (or `USE_LOCAL_JUDGE=1`) |
+| `eval_ragas.py` | `chroma_db/`, `eval/golden_qa.json` | Ollama + `GOOGLE_API_KEY` (or `USE_LOCAL_JUDGE=1`) |
+| `eval_deepeval.py` | `chroma_db/`, `eval/golden_qa.json` | Ollama + `GOOGLE_API_KEY` (or `USE_LOCAL_JUDGE=1`) |
