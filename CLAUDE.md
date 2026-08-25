@@ -24,7 +24,8 @@ python src/agent.py "Multi-step question"   # Test agent tool routing
 python src/eval_custom.py                   # Run hand-rolled eval harness
 python src/eval_ragas.py                    # Run RAGAS evaluation
 
-# Optional: copy .env.example → .env and add LangSmith keys for tracing
+# Required for eval: copy .env.example → .env and add GOOGLE_API_KEY (Gemini judge)
+# Optional: also add LangSmith keys for tracing
 ```
 
 ## Architecture
@@ -49,9 +50,9 @@ data/zephyr_handbook.md
 
 **`src/agent.py`** — LangGraph ReAct agent with two tools: `search_handbook()` (wraps retriever) and `calculator()` (whitelist-validated arithmetic). Handles multi-step questions that require retrieval then calculation.
 
-**`src/eval_custom.py`** — Hand-rolled eval harness measuring: retrieval hit rate, keyword correctness, abstention (hallucination test), and LLM-as-judge. The `REPEATS` parameter (default 1) controls multi-run variance measurement.
+**`src/eval_custom.py`** — Hand-rolled eval harness measuring: retrieval hit rate, keyword correctness, abstention (hallucination test), and LLM-as-judge (Gemini 2.5 Flash via `ChatGoogleGenerativeAI`). The `REPEATS` parameter (default 1) controls multi-run variance measurement.
 
-**`src/eval_ragas.py`** — RAGAS evaluation using local Ollama via `LangchainLLMWrapper` (avoids paid OpenAI). Computes faithfulness, answer relevancy, context precision, and context recall.
+**`src/eval_ragas.py`** — RAGAS evaluation using Gemini 2.5 Flash as the judge via `LangchainLLMWrapper(ChatGoogleGenerativeAI(...))`. Computes faithfulness, answer relevancy, context precision, and context recall. Embeddings still use local Ollama (`nomic-embed-text`).
 
 ### Golden Dataset
 
@@ -62,5 +63,5 @@ data/zephyr_handbook.md
 - **Fictional corpus**: Forces retrieval dependency; model cannot rely on training data
 - **Temperature=0**: Reduces variance in generation for more reproducible evals
 - **`answer_with_context()`**: Returns contexts alongside answers—RAGAS and custom eval both need the retrieved chunks, not just the final answer
-- **RAGAS local stack**: `LangchainLLMWrapper` + Ollama keeps RAGAS free; trade-off is slower execution and occasional timeouts (mitigated by `max_workers=1`, 180s timeout, small dataset)
+- **Gemini 2.5 Flash as judge**: Both `eval_custom.py` and `eval_ragas.py` use `JUDGE_MODEL = "gemini-2.5-flash"` (defined in `rag_chain.py`) via `ChatGoogleGenerativeAI`. Requires `GOOGLE_API_KEY` in `.env`. Ollama is still used for RAG generation and embeddings; only the judge role uses Gemini.
 - **Calculator whitelist**: `re.fullmatch(r'[\d\s\+\-\*/\(\)\.]+', expression)` prevents code injection via the tool
