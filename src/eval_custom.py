@@ -26,8 +26,8 @@ Run:  python src/eval_custom.py
 """
 
 import json
-from langchain_ollama import ChatOllama
-from rag_chain import answer_with_context,JUDGE_MODEL
+from langchain_google_genai import ChatGoogleGenerativeAI
+from rag_chain import answer_with_context, JUDGE_MODEL
 
 REPEATS = 1   # bump to 3 to see run-to-run variance (recommended once it works)
 
@@ -91,7 +91,7 @@ ANSWER:
 
 Verdict (PASS or FAIL):"""
 
-judge = ChatOllama(model=JUDGE_MODEL, temperature=0)
+judge = ChatGoogleGenerativeAI(model=JUDGE_MODEL, temperature=0)
 
 
 def llm_judge(answer, contexts) -> bool:

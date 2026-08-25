@@ -1,11 +1,12 @@
-# Everything here is free and open source.
-# The only "engine" is Ollama, installed separately (see SETUP.md).
+# The only local "engine" is Ollama, installed separately (see SETUP.md).
+# Gemini 2.5 Flash is used as the LLM judge (requires GOOGLE_API_KEY in .env).
 
 langchain>=0.3
 langchain-community>=0.3
 langchain-core>=0.3
 langchain-ollama>=0.2      # local LLM + embeddings
 langchain-chroma>=0.1      # free local vector store
+langchain-google-genai>=2.0  # Gemini 2.5 Flash as LLM judge
 langchain-text-splitters>=0.3
 langgraph>=0.2             # the agent framework (step 6)
 ragas>=0.2                 # free eval library (step 7); runs on local models

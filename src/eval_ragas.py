@@ -16,19 +16,19 @@ What you learn: precision vs recall on the RETRIEVAL side is the single most
 useful diagnostic in RAG. Low precision -> tighten/lower k. Low recall ->
 fix chunking or raise k. You are localising the fault before touching the LLM.
 
-THE "NOT ACTUALLY FREE" TRAP (important):
-RAGAS defaults to OpenAI, which costs money and needs an API key. To keep this
-100% free we point RAGAS at your LOCAL Ollama model using LangchainLLMWrapper.
-Watch out: local judges are slower and RAGAS has a known habit of TIMING OUT
-against Ollama. Mitigations are applied below (low k, small dataset, longer
-timeout). If a metric returns NaN, that is usually a timeout, not a zero.
+THE JUDGE LLM:
+RAGAS defaults to OpenAI. Here we point it at Gemini 2.5 Flash via
+LangchainLLMWrapper, which requires a GOOGLE_API_KEY in your .env file.
+Gemini is faster and more reliable than local Ollama judges for RAGAS.
+If a metric returns NaN, check that GOOGLE_API_KEY is set correctly.
 
 Run (after ingest.py):  python src/eval_ragas.py
 """
 
 import json
-from langchain_ollama import ChatOllama, OllamaEmbeddings
-from rag_chain import answer_with_context, CHAT_MODEL, EMBED_MODEL
+from langchain_ollama import OllamaEmbeddings
+from langchain_google_genai import ChatGoogleGenerativeAI
+from rag_chain import answer_with_context, JUDGE_MODEL, EMBED_MODEL
 
 # RAGAS 0.2.x imports. If these fail, check `pip show ragas` — the API changed
 # across versions. Your hand-rolled eval_custom.py is the version-proof backup.
@@ -65,8 +65,8 @@ def build_dataset():
 def main():
     dataset = build_dataset()
 
-    # Point RAGAS at LOCAL models — this is the line that keeps it free.
-    evaluator_llm = LangchainLLMWrapper(ChatOllama(model=CHAT_MODEL, temperature=0))
+    # Point RAGAS at Gemini 2.5 Flash as the judge model.
+    evaluator_llm = LangchainLLMWrapper(ChatGoogleGenerativeAI(model=JUDGE_MODEL, temperature=0))
     evaluator_emb = LangchainEmbeddingsWrapper(OllamaEmbeddings(model=EMBED_MODEL))
 
     # Longer timeout + no parallelism helps local models survive the run.
