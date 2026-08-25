@@ -18,6 +18,9 @@ Run directly to try a question:  python src/rag_chain.py "How much is Pro?"
 """
 
 import sys
+from dotenv import load_dotenv
+load_dotenv()
+
 from langchain_ollama import OllamaEmbeddings, ChatOllama
 from langchain_chroma import Chroma
 from langchain_core.prompts import ChatPromptTemplate
