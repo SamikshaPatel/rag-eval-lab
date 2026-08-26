@@ -1,343 +1,387 @@
 # Execution Runbook
 
-A step-by-step guide to running the project. Each step tells you what to run,
-what to expect, what to check, and what you are learning.
+Step-by-step guide to running the RAG Evaluation Lab from scratch. Each step
+states its **purpose**, exact **action**, **expected output**, and how to
+**evaluate / verify** success.
 
-Work through these in order — each step depends on the one before it.
+Work through steps in order — each depends on the one before it. Steps 10, 11,
+and 13 are performed in the LangSmith web UI (no code required).
 
 ---
 
-## Step 0 — Prerequisites check
+## Step 0 — Prerequisites Check
 
-Before anything else, confirm your tools are in place.
+**Purpose:** Confirm the required tools are installed before starting anything else.
 
+**Action:**
 ```bash
-ollama --version          # should print a version number
-python3 --version          # should be 3.10+
-gh --version              # optional, only needed if you want to push to GitHub
+ollama --version
+python3 --version
 ```
 
-**What to expect:** Three version strings, no errors.
+**Expected output:**
+- `ollama` prints a version string, e.g. `ollama version 0.x.x`
+- `python3` prints `Python 3.10.x` or higher
 
-**If Ollama is missing:** Download from https://ollama.com and install.
+**Evaluate / Verify:**
+Both commands return version numbers with no errors.
+
+**If this fails:**
+- Ollama missing → download from https://ollama.com
+- Python < 3.10 → install from https://python.org
 
 ---
 
 ## Step 1 — Start Ollama
 
-Ollama must be running as a background server before any script can use it.
+**Purpose:** Ollama must be running as a background HTTP server on port 11434
+before any script can use it for embeddings or generation.
 
+**Action:**
 ```bash
 ollama serve
 ```
 
-Leave this terminal open. Open a new terminal for everything else.
+Leave this terminal open. Open a **new terminal** for all remaining steps.
 
-**What to expect:** A log line like `Listening on 127.0.0.1:11434`.
+**Expected output:**
+```
+Listening on 127.0.0.1:11434
+```
 
-**Verify:**
+**Evaluate / Verify:**
 ```bash
 curl http://localhost:11434
-# should print: Ollama is running
+# Expected response: Ollama is running
 ```
+
+**If this fails:** Port 11434 may already be in use by another Ollama process.
+Run `pkill ollama` then retry.
 
 ---
 
-## Step 2 — Pull the models
+## Step 2 — Pull Required Models
 
+**Purpose:** Download the two models this project uses. One converts text into
+vectors (embedding model); the other writes answers (generation model).
+These are downloaded once and cached locally.
+
+**Action:**
 ```bash
-ollama pull llama3.1:8b        # ~4.7 GB — the generation model
-ollama pull nomic-embed-text   # ~275 MB — the embedding model
+ollama pull llama3.1:8b         # ~4.7 GB — generation model
+ollama pull nomic-embed-text    # ~275 MB — embedding model
 ```
 
-These are one-time downloads. Each prints a progress bar.
+Each command shows a download progress bar.
 
-**What to expect:** Both end with `success`.
+**Expected output:**
+Both commands end with `success`.
 
-**Verify:**
+**Evaluate / Verify:**
 ```bash
 ollama list
-# should show both llama3.1:8b and nomic-embed-text
+# Both models must appear in the list
 ```
 
-**Learning note:** RAG uses *two* models — one to turn text into vectors
-(embedding), one to generate answers. Confusing these is the #1 beginner error.
+**Key concept:** RAG uses *two* separate models — an embedding model to index
+and search the vector store, and a generation model to write the final answer.
+Confusing these two is the most common beginner mistake.
 
 ---
 
-## Step 3 — Python environment
+## Step 3 — Python Environment
 
+**Purpose:** Create an isolated Python environment and install all project
+dependencies so scripts run without version conflicts.
+
+**Action:**
 ```bash
 python3 -m venv .venv
-source .venv/bin/activate       # Windows: .venv\Scripts\activate
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-**What to expect:** `pip install` prints a list of packages ending with
-`Successfully installed ...`. Your prompt should show `(.venv)`.
+Your terminal prompt should now show `(.venv)`.
 
-**Verify:**
+**Expected output:**
+`pip install` ends with `Successfully installed ...` followed by a list of packages.
+
+**Evaluate / Verify:**
 ```bash
-python3 -c "import langchain, ragas, langgraph; print('OK')"
-# should print: OK
+python3 -c "import langchain, ragas, langgraph, deepeval; print('OK')"
+# Expected: OK
 ```
+
+**If this fails:** Run `pip install --upgrade pip` first, then retry the install.
 
 ---
 
-## Step 4 — API keys
+## Step 4 — Configure API Keys
 
+**Purpose:** Set credentials for Gemini (LLM judge for evaluations) and
+LangSmith (tracing + evaluation UI). LangSmith is optional but strongly
+recommended — it makes every pipeline step visible and enables the UI
+comparison in Steps 10–13.
+
+**Action:**
 ```bash
 cp .env.example .env
 ```
 
-Open `.env` and fill in:
+Open `.env` in a text editor and fill in the following:
 
-| Key | Where to get it | Required? |
-|-----|----------------|-----------|
-| `GOOGLE_API_KEY` | https://aistudio.google.com/apikey | **Yes** — needed for eval steps |
-| `LANGSMITH_API_KEY` | https://smith.langchain.com → Settings → API Keys | No — but gives you traces |
+| Variable | Where to get it | Required? |
+|----------|----------------|-----------|
+| `GOOGLE_API_KEY` | https://aistudio.google.com/apikey | **Yes** — eval scripts use Gemini as judge |
+| `LANGSMITH_API_KEY` | https://smith.langchain.com → Settings → API Keys | **Recommended** — enables tracing and UI comparison |
+| `LANGSMITH_TRACING` | Set to `true` | Recommended — activates automatic tracing |
+| `LANGSMITH_PROJECT` | Set to `rag-eval-lab` | Recommended — keeps all traces in one project |
 
-Load the file into your shell:
-
+Load the file into your current shell session:
 ```bash
 set -a && source .env && set +a
 ```
 
-**Verify:**
+**Evaluate / Verify:**
 ```bash
-echo $GOOGLE_API_KEY    # should print your key, not blank
+echo $GOOGLE_API_KEY        # should print your key (not blank)
+echo $LANGSMITH_API_KEY     # should print your key (not blank)
 ```
 
-**What breaks without it:** `eval_custom.py` and `eval_ragas.py` will throw an
-authentication error when they try to call the Gemini judge.
+**If either prints blank:** The `.env` file did not load. Re-run the
+`set -a && source .env && set +a` command and verify again.
 
 ---
 
-## Step 5 — Build the vector store (`ingest.py`)
+## Step 5 — Build the Vector Store
 
+**Purpose:** Chunk the handbook into searchable pieces, embed each chunk, and
+save to ChromaDB on disk. This is the "index" that all retrieval steps search
+against. Run once; re-run only if you change the source data or chunk settings.
+
+**Action:**
 ```bash
 python3 src/ingest.py
 ```
 
 **What happens inside:**
-1. Loads `data/zephyr_handbook.md` (the fictional product handbook)
-2. Splits it into 400-character chunks with 80-character overlap
-3. Embeds each chunk with `nomic-embed-text` via Ollama
-4. Saves everything to `./chroma_db/`
+1. Loads `data/zephyr_handbook.md` — a fictional product handbook the LLM has
+   never seen in training, so all correct answers *must* come from retrieval
+2. Splits the document into 400-character chunks with 80-character overlap
+3. Embeds each chunk using `nomic-embed-text` via Ollama
+4. Saves the vector store to `./chroma_db/`
 
-**What to expect:**
+**Expected output:**
 ```
-Loaded 1 document(s).
-Split into N chunks.
-Embeddings stored in ./chroma_db/
+Loaded 1 document(s), 2478 characters.
+Split into 9 chunks.
+Embedded and stored 9 chunks in ./chroma_db.
+Ingestion complete. You can now run src/rag_chain.py
 ```
 
-**Verify:**
+**Evaluate / Verify:**
 ```bash
-ls chroma_db/    # should contain files (sqlite db + vector data)
+ls chroma_db/
+# Must contain chroma.sqlite3 and at least one UUID-named folder
 ```
 
-**What breaks if you skip this:** Every other script fails because the vector
-store doesn't exist yet.
+**If this fails:** Ollama is not running or `nomic-embed-text` was not pulled.
+Check Steps 1 and 2.
 
-**Experiment to try (Day 3):** Change `chunk_size=400` to `chunk_size=100` in
-`ingest.py`, re-run, then re-run `rag_chain.py` with the same question. Watch
-quality drop. This is a controlled experiment showing chunking is a tuning knob.
+**Tuning experiment (try later):** Change `chunk_size=400` to `chunk_size=100`
+in `ingest.py`, re-run, then re-run `rag_chain.py` on the same question. Answer
+quality typically drops — this demonstrates chunk size as a tunable variable.
 Reset to 400 when done.
 
 ---
 
-## Step 6 — Test the RAG pipeline (`rag_chain.py`)
+## Step 6 — Test the RAG Pipeline
 
+**Purpose:** Manually verify the end-to-end RAG pipeline before running
+automated evaluations. Builds intuition for what retrieval + generation looks
+like, and what correct vs. incorrect behaviour feels like.
+
+**Action:**
 ```bash
 python3 src/rag_chain.py "How much does the Pro plan cost?"
-```
-
-Try a few questions:
-```bash
 python3 src/rag_chain.py "What is the API rate limit on the Pro plan?"
-python3 src/rag_chain.py "What is the capital of France?"   # out-of-corpus test
+python3 src/rag_chain.py "What is the capital of France?"
 ```
 
-**What to expect:**
-- In-corpus questions: a grounded answer drawn from the handbook
-- Out-of-corpus question: `"I don't know based on the handbook."`
-- Printed below the answer: the 3 retrieved chunks the model was allowed to see
+**Expected output per question:**
 
-**What you are learning:**
-- The answer is only as good as what was retrieved
-- The grounding prompt (`"use ONLY the context below"`) is what forces the
-  model to say "I don't know" — not the model itself
-- Reading the retrieved chunks tells you *why* an answer is right or wrong
+| Question | Expected answer | Why this matters |
+|----------|----------------|-----------------|
+| Pro plan cost? | `$49 per seat per month` | Basic in-corpus retrieval |
+| API rate limit on Pro? | `1,000 requests per minute` | Distractor test — Free=100, Enterprise=10,000 |
+| Capital of France? | `I don't know based on the handbook.` | Grounding test — not in corpus |
 
-**If the answer hallucinates on the France question:** The grounding prompt is
-not working as intended — this is worth investigating before moving on.
+Below each answer the script prints the 3 retrieved chunks the model was given.
 
-**Verify in LangSmith (if you set up the key in Step 4)**
+**Evaluate / Verify:**
+1. The France question **must** say `"I don't know based on the handbook."` —
+   any other response means the grounding prompt is broken; investigate before continuing
+2. Read the printed chunks for each in-corpus question — if the right fact
+   appears in the chunks but the answer is wrong, the generation model is at
+   fault; if the right fact is absent from all chunks, retrieval is at fault
 
-1. Go to https://smith.langchain.com
-2. **Projects** in the left sidebar → open **rag-eval-lab**
-3. Click the trace for the question you just ran
+**View the trace in LangSmith (if LANGSMITH_API_KEY is set):**
+1. Go to https://smith.langchain.com → **Projects** → **rag-eval-lab**
+2. Click the most recent trace (one per question you just ran)
+3. Expand the trace tree:
+   ```
+   ▶ RunnableSequence
+     ├── retrieve          → shows the 3 chunks fetched from chroma_db
+     ├── ChatPromptTemplate → the grounding prompt with context filled in
+     ├── ChatOllama        → the LLM call (exact input prompt + raw output)
+     └── StrOutputParser   → the final answer text
+   ```
+4. Click the **retrieve** step → confirm the correct fact chunk is present
+5. Click the **ChatOllama** step → see the exact prompt the model received
 
-You'll see the pipeline broken down step by step:
-```
-▶ RunnableSequence
-  ├── retrieve          → the 3 chunks fetched from chroma_db
-  ├── ChatPromptTemplate → the grounding prompt with context filled in
-  ├── ChatOllama        → LLM call (input: full prompt, output: the answer)
-  └── StrOutputParser   → final text
-```
-
-**What to look for in the trace:**
-- **retrieve** step — did the right chunks come back? Wrong chunks = wrong answer, regardless of the LLM
-- **ChatOllama** step — shows the exact prompt the model saw and its raw response
-- Latency column — shows which step is the bottleneck (usually the LLM call)
-
-**If no traces appear:** confirm your env vars loaded correctly:
-```bash
-source .env && echo $LANGSMITH_API_KEY   # should print your ls__... key
-```
-If blank, re-run the script with the env loaded first:
-```bash
-source .env && source .venv/bin/activate && python3 src/rag_chain.py "How much does the Pro plan cost?"
-```
+This trace view is the most important debugging tool in RAG systems.
 
 ---
 
-## Step 7 — Test the agent (`agent.py`)
+## Step 7 — Test the Agent
 
+**Purpose:** Verify the LangGraph ReAct agent correctly routes questions to the
+right tool, including multi-step reasoning that combines retrieval and
+calculation in sequence.
+
+**Action:**
 ```bash
 python3 src/agent.py "What is the API rate limit on the Pro plan?"
 python3 src/agent.py "What is 2 + 2?"
 python3 src/agent.py "I need 90 extra days of retention. What will it cost?"
 ```
 
-**What to expect:**
-- Question 1: agent calls `search_handbook` tool, returns retrieved answer
-- Question 2: agent calls `calculator` tool, returns `4`
-- Question 3 (multi-step): agent calls `search_handbook` to find add-on pricing
-  (15 dollars per 30 days), then calls `calculator` to compute 90/30*15 = 45
+**Expected output per question:**
 
-**What you are learning:**
-- The agent *decides* which tool to call based on the tool's docstring
-- Multi-step reasoning: the model can chain tool calls
-- New failure modes vs. a plain RAG chain: wrong tool choice, wrong arguments,
-  infinite loops — these require different testing strategies
+| Question | Tool(s) called | Expected answer |
+|----------|---------------|----------------|
+| API rate limit? | `search_handbook` | 1,000 requests per minute |
+| What is 2 + 2? | `calculator` | 4 |
+| 90 days retention cost? | `search_handbook` → `calculator` | $45.00 |
 
-**If the multi-step question gives the wrong answer:** Check whether the agent
-called both tools (it should). If it only called one, the tool descriptions may
-need to be clearer — this is itself a lesson in how tool docstrings drive routing.
+For the third (multi-step) question, the agent must:
+1. Call `search_handbook` → retrieves: add-on costs $15 per 30 days
+2. Call `calculator` with `90 / 30 * 15` → returns `45.0`
+3. Report the final answer as `$45.00`
+
+**Evaluate / Verify:**
+- Correct final answer for all three questions
+- In LangSmith, open the agent trace → confirm both `search_handbook` AND
+  `calculator` appear as separate tool call nodes for the third question
+- If the agent only called one tool and still got the right answer, it may have
+  guessed — the trace will reveal which tools actually fired
+
+**Known warning (non-blocking):**
+```
+LangGraphDeprecatedSinceV10: create_react_agent has been moved to langchain.agents.
+```
+This deprecation warning does not affect correctness.
 
 ---
 
-## Step 8 — Hand-rolled evaluation (`eval_custom.py`)
+## Step 8 — Hand-Rolled Evaluation
 
+**Purpose:** Run a custom evaluation harness that measures four metrics without
+any external framework. Establishes a baseline and teaches the core ideas behind
+automated evaluation before introducing heavier tools.
+
+**Action:**
 ```bash
 python3 src/eval_custom.py
 ```
 
-**What happens inside:**
-Runs all 8 golden questions through the RAG chain and measures 4 metrics:
+**What it measures:**
 
 | Metric | What it checks |
 |--------|---------------|
-| Retrieval hit rate | Did the retriever fetch a chunk containing the answer? |
-| Keyword correctness | Does the answer contain the expected keywords? |
+| Retrieval hit rate | Did any retrieved chunk contain the expected answer keyword? |
+| Keyword correctness | Does the generated answer contain the expected keywords? |
 | Abstention | Did the model say "I don't know" for out-of-corpus questions? |
-| LLM-as-judge | Does the judge model (Gemini 3.6 Flash or local Ollama) grade the answer as faithful to the context? |
+| LLM-as-judge | Does Gemini grade the answer as faithful to the retrieved context? |
 
-**What to expect:**
+**Expected output:**
 ```
 ===== RUN 1 of 1 =====
-[in ] retrieval=Y keyword=Y judge=Y :: How much does the Pro plan cost?
-...
-[out] abstention=Y (OK) :: What is the Zephyr mobile app called?
-...
-===== SUMMARY (pass rates across all runs) =====
+[in ] retrieval=Y keyword=Y judge=Y :: How many dashboards does the Free plan include?
+[in ] retrieval=Y keyword=Y judge=Y :: How much does the Pro plan cost per seat per month?
+[in ] retrieval=Y keyword=N judge=N :: Which plans include the Pulse feature?
+[in ] retrieval=Y keyword=Y judge=Y :: What is the API rate limit on the Pro plan?
+[in ] retrieval=Y keyword=Y judge=Y :: How long is data retained on the Free plan?
+[in ] retrieval=Y keyword=Y judge=Y :: In which cities does Zephyr run its data centres?
+[out] abstention=Y (OK) :: What is Zephyr Analytics' stock price?
+[out] abstention=Y (OK) :: Who is the CEO of Zephyr Analytics?
+
+===== SUMMARY =====
 Retrieval hit rate : 6/6 = 100%
 Keyword correctness: 5/6 = 83%
-LLM-judge faithful : 6/6 = 100%
+LLM-judge faithful : 5/6 = 83%
 Abstention (no hallucination): 2/2 = 100%
 ```
 
-Your numbers will likely differ — that is expected.
+**Evaluate / Verify:**
+- `Abstention = 2/2` is non-negotiable — any hallucination on an out-of-corpus
+  question is a FAIL requiring investigation
+- `Retrieval hit rate = 6/6` should be 100%; a miss indicates a broken vector
+  store or embedding problem
+- `Retrieval hit rate > Keyword correctness` → retriever found the right chunk
+  but generator produced a wrong answer
+- `Retrieval hit rate = Keyword correctness` but LLM-judge fails → judge
+  disagrees with the keyword check; check the judge prompt
+- The "Pulse" question (`Which plans include the Pulse feature?`) is an
+  expected FAIL — documented as a known retrieval gap in TEST_RUNBOOK TR-04
 
-**Key things to check:**
-- Any `[out]` row marked `HALLUCINATED` is a problem — the model invented an
-  answer for a question that isn't in the handbook
-- Retrieval hit rate lower than keyword correctness means the retriever is
-  failing, not the generator
-- Retrieval hit rate higher than keyword correctness means the generator is
-  failing even with good context
+**LangSmith traces:** Each of the 8 questions creates a trace in the
+`rag-eval-lab` project. You can inspect which chunks each question retrieved
+without changing any code.
 
-**Experiment to try:** Change `REPEATS = 1` to `REPEATS = 3` at the top of
-`eval_custom.py` and re-run. Watch the summary numbers move between runs. This
-variance is the core reason AI testing differs from traditional QA — a single
-run proves nothing.
-
----
-
-## Step 9 — RAGAS evaluation (`eval_ragas.py`)
-
-```bash
-python3 src/eval_ragas.py
-```
-
-**What happens inside:**
-Runs the same in-corpus questions through RAGAS, using Gemini 2.5 Flash as the
-judge and `nomic-embed-text` for embeddings.
-
-**What to expect** (scores between 0 and 1, higher is better):
-```
-===== RAGAS SCORES =====
-{'faithfulness': 0.92, 'answer_relevancy': 0.88, 'context_precision': 0.75, 'context_recall': 0.83}
-```
-
-**How to read the scores:**
-
-| Score | Low means... | Fix |
-|-------|-------------|-----|
-| `faithfulness` | Model is inventing beyond the context | Tighten the grounding prompt |
-| `answer_relevancy` | Answer wanders off the question | Review prompt or raise `k` |
-| `context_precision` | Retriever pulls irrelevant chunks (noise) | Lower `k` or improve chunking |
-| `context_recall` | Retriever misses needed facts | Raise `k` or re-chunk |
-
-**What you are learning:** Compare these scores against your hand-rolled numbers
-from Step 8. Where they agree, you can trust the signal. Where they disagree,
-investigate — one of the two methods is wrong, and figuring out which one is a
-real testing skill.
-
-**If you see `NaN`:** Check that `GOOGLE_API_KEY` is set and you haven't hit
-the free-tier rate limit (20 req/day for `gemini-3.6-flash`). Re-run after a
-minute, or set `USE_LOCAL_JUDGE=1` in `.env` to fall back to Ollama.
+**Variance experiment:** Change `REPEATS = 1` to `REPEATS = 3` at the top of
+`eval_custom.py` and re-run. If the LLM-judge score shifts between runs, you
+have observed why a single eval run is not enough to trust.
 
 ---
 
-## Step 10 — DeepEval evaluation (`eval_deepeval.py`)
+## Step 9 — DeepEval: Baseline Run with Local Judge
 
+**Purpose:** Run DeepEval's four RAG metrics using the local `llama3.1:8b`
+model as judge (free, no quota). This is your baseline — you will compare it
+against the Gemini-judged run in Step 12 to understand how much judge quality
+affects scores.
+
+**Action:**
 ```bash
-USE_LOCAL_JUDGE=1 python3 src/eval_deepeval.py   # local Ollama judge (free, no quota)
-python3 src/eval_deepeval.py                      # Gemini judge (requires quota)
+USE_LOCAL_JUDGE=1 python3 src/eval_deepeval.py
 ```
 
-**What happens inside:**
-Runs the same in-corpus questions through DeepEval — a pytest-style eval
-framework. Uses the same four metrics as RAGAS but makes fewer LLM sub-calls
-per metric, so it is faster and less likely to exhaust the Gemini free tier.
+**What it measures:**
 
 | Metric | What it checks |
 |--------|---------------|
-| Faithfulness | Answer grounded in retrieved context? |
-| Answer Relevancy | Answer actually addresses the question? |
-| Contextual Recall | Context covers all facts in the reference answer? |
-| Contextual Precision | Retrieved chunks are on-topic? |
+| Faithfulness | Is every claim in the answer supported by the retrieved context? |
+| Answer Relevancy | Does the answer actually address the question that was asked? |
+| Contextual Recall | Does the retrieved context contain all facts needed for the reference answer? |
+| Contextual Precision | Are the retrieved chunks on-topic (no irrelevant noise)? |
 
-**Judge selection:**
-- Default: `gemini-3.6-flash` via `GOOGLE_API_KEY` (20 req/day free tier)
-- Fallback: set `USE_LOCAL_JUDGE=1` in `.env` to use `llama3.1:8b` locally
-
-**What to expect (local judge baseline):**
+**Expected output (baseline — your numbers may differ slightly):**
 ```
+[judge] Using local Ollama model: llama3.1:8b
+Running RAG pipeline over golden dataset...
+
+[out] abstention=Y (OK) :: What is Zephyr Analytics' stock price?
+[out] abstention=Y (OK) :: Who is the CEO of Zephyr Analytics?
+
+===== PER-QUESTION RESULTS =====
+[FAIL] How many dashboards does the Free plan include?
+       ✓ Faithfulness                 1.00
+       ✓ Answer Relevancy             1.00
+       ✗ Contextual Recall            0.50
+       ✓ Contextual Precision         0.83
+...
+
 ===== SUMMARY =====
 Faithfulness          avg: 0.58  pass: 2/6  (threshold: 0.7)
 Answer Relevancy      avg: 0.83  pass: 4/6  (threshold: 0.7)
@@ -346,44 +390,290 @@ Contextual Precision  avg: 0.83  pass: 6/6  (threshold: 0.7)
 Abstention (no hallucination): 2/2 = 100%
 ```
 
-**What you are learning:**
-- The same four metrics can be computed by different frameworks — compare
-  DeepEval scores against RAGAS scores; if they disagree significantly,
-  investigate whether the framework or the judge is the variable
-- Local vs cloud judge quality is a real trade-off: `llama3.1:8b` produces
-  noisier scores than Gemini, especially for faithfulness
-- Contextual Recall < 0.7 across all questions points to a retrieval gap —
-  try raising `k` from 3 → 5 in `rag_chain.py`
+**Evaluate / Verify:**
+- **Contextual Precision ≥ 0.83** — retriever fetches relevant chunks; this is good
+- **Contextual Recall ≈ 0.51** — retriever consistently misses some needed
+  facts; this is the primary problem (root cause: k=3 may not fetch enough chunks)
+- **Faithfulness ≈ 0.58** — local model adds embellishments beyond the context;
+  expect Gemini judge to score this metric differently in Step 12
+- **Record these numbers** in TEST_RUNBOOK TR-07 — you will compare them
+  against the Gemini run in Step 12
 
-**If all tests FAIL at 0% pass rate:**
-The local judge is not following DeepEval's structured output format reliably.
-Re-run with the Gemini judge (when quota allows) for authoritative scores.
+**Note on local judge quality:** `llama3.1:8b` is a weaker judge than Gemini.
+It may evaluate faithfulness inconsistently. Steps 10–13 use LangSmith to get
+authoritative, Gemini-judged scores.
 
 ---
 
-## Step 11 — Extend the golden dataset
+## Step 10 — LangSmith UI: Upload the Golden Dataset
 
+**Purpose:** Upload the 8 golden QA pairs into LangSmith so every future eval
+run is tracked as a named experiment and can be compared side by side in the UI.
+You only do this once — the dataset persists in LangSmith.
+
+**Prerequisite:** LANGSMITH_API_KEY set in `.env` (Step 4). Logged in at
+https://smith.langchain.com.
+
+**Action (UI steps):**
+
+1. Go to https://smith.langchain.com
+2. In the left sidebar, click **Datasets & Testing**
+3. Click **+ New Dataset** (top right button)
+4. Fill in:
+   - **Name:** `rag-eval-golden`
+   - **Description:** `Golden QA pairs for Zephyr Analytics RAG evaluation`
+   - **Dataset type:** leave as default (key-value)
+5. Click **Create Dataset**
+6. On the dataset detail page, click **+ Add examples** → **Upload file**
+7. Upload the file `eval/golden_qa.json` from your local machine
+8. In the field mapping step:
+   - Set **Input** to `question`
+   - Set **Output** (expected) to `reference`
+   - Other fields (`in_corpus`, `must_contain`, `note`) will appear as metadata
+9. Click **Submit** / **Confirm**
+
+**Evaluate / Verify:**
+- The dataset page shows **8 examples**
+- Click any example row — the `question` field shows as input and `reference`
+  shows as expected output
+- The `in_corpus` flag is visible in the metadata panel
+
+**What this unlocks:** Every eval run (local judge, Gemini judge, k=5 tuning run)
+can now be run as a separate "Experiment" against this dataset and compared side
+by side in the LangSmith Experiments tab — no extra code required.
+
+---
+
+## Step 11 — LangSmith UI: Set Up Online Evaluators
+
+**Purpose:** Configure LangSmith to automatically score every RAG trace that
+lands in your project using an LLM judge. Scores appear alongside traces
+within ~30 seconds of each run — no code changes needed.
+
+**Prerequisite:** Steps 4 and 10 complete. LangSmith must have access to your
+Gemini key (it uses your connected account or you paste the key in the evaluator
+settings).
+
+**Action (UI steps):**
+
+1. Go to https://smith.langchain.com → **Projects** → **rag-eval-lab**
+2. Click the **Rules** tab (may appear as **Automations** or **Evaluators**
+   depending on your LangSmith version)
+3. Click **+ New Rule** → choose **LLM-as-Judge**
+4. Configure the first evaluator — **Faithfulness**:
+   - **Name:** `Faithfulness`
+   - **Prompt template:**
+     ```
+     You are evaluating a RAG system answer.
+
+     Question: {input}
+     Answer: {output}
+
+     Score from 0.0 to 1.0: is every claim in the answer directly supported
+     by the retrieved context, with nothing added beyond what the context says?
+
+     Respond with only a JSON object: {"score": <number between 0 and 1>}
+     ```
+   - **Model:** select a Gemini model (e.g. Gemini 2.0 Flash)
+   - **Score field:** `score`
+   - **Sampling rate:** 100% (score every trace)
+5. Click **Save**
+6. Repeat to add a second evaluator — **Answer Relevancy**:
+   - **Name:** `Answer Relevancy`
+   - **Prompt template:**
+     ```
+     Question: {input}
+     Answer: {output}
+
+     Score from 0.0 to 1.0: does the answer directly and completely address
+     the question? A score of 1.0 means fully on-topic and complete.
+
+     Respond with only a JSON object: {"score": <number between 0 and 1>}
+     ```
+   - Same model and sampling settings
+
+**Evaluate / Verify:**
+- Both evaluators appear in the Rules/Automations tab with status **Active**
+- Run one manual question to trigger a trace:
+  ```bash
+  python3 src/rag_chain.py "How much does the Pro plan cost?"
+  ```
+- Go to **Projects** → **rag-eval-lab** → **Traces**
+- Open the new trace → scroll to the **Feedback** or **Scores** section
+- Within ~30 seconds you should see `Faithfulness` and `Answer Relevancy`
+  scores populated by the evaluators
+
+**If scores don't appear:** Check that the evaluator is set to **Active** and
+that your Gemini credentials are connected in LangSmith settings.
+
+---
+
+## Step 12 — DeepEval: Run with Gemini Judge
+
+**Purpose:** Re-run the same DeepEval metrics from Step 9, this time using
+Gemini as the judge. This is the authoritative baseline — Gemini's evaluation
+is more consistent than the local model. Compare the results against Step 9
+to understand how judge quality affects scores.
+
+**Prerequisite:** `GOOGLE_API_KEY` set in `.env` and Gemini free-tier quota
+available (20 requests/day on `gemini-3.6-flash`). If quota was exhausted
+during Step 8, run this the next day.
+
+**Action:**
+```bash
+python3 src/eval_deepeval.py
+```
+
+(No `USE_LOCAL_JUDGE=1` — Gemini is the default.)
+
+**Expected output format:**
+```
+[judge] Using Gemini: gemini-3.6-flash
+Running RAG pipeline over golden dataset...
+...
+===== SUMMARY =====
+Faithfulness          avg: X.XX  pass: N/6  (threshold: 0.7)
+Answer Relevancy      avg: X.XX  pass: N/6  (threshold: 0.7)
+Contextual Recall     avg: X.XX  pass: N/6  (threshold: 0.7)
+Contextual Precision  avg: X.XX  pass: N/6  (threshold: 0.7)
+Abstention (no hallucination): 2/2 = 100%
+```
+
+**Evaluate / Verify:**
+1. Record the summary scores in TEST_RUNBOOK TR-10
+2. Compare each metric against the Step 9 (local judge) results:
+   - **Faithfulness:** expect Gemini to score differently from local — a large
+     gap means local judge is unreliable for this metric
+   - **Contextual Precision:** expect similar results — this metric is more
+     objective and less sensitive to judge quality
+   - **Contextual Recall:** may shift — Gemini understands nuanced gaps better
+3. Go to LangSmith → **Projects** → **rag-eval-lab** → **Traces** — the 6
+   in-corpus questions each created a new trace; the online evaluators from
+   Step 11 score them automatically
+
+**If quota error appears:**
+```
+ResourceExhausted: 429 Resource has been exhausted
+```
+Set `USE_LOCAL_JUDGE=1` temporarily and try again tomorrow for the Gemini run.
+
+---
+
+## Step 13 — LangSmith UI: Compare Experiments
+
+**Purpose:** View the local-judge run (Step 9) and the Gemini-judge run (Step 12)
+side by side in LangSmith. The comparison view shows per-question scores for
+each metric across both runs — this is where you identify which failures are
+pipeline problems vs. judge quality problems.
+
+**Prerequisite:** Steps 9 and 12 both complete, LANGSMITH_API_KEY set.
+
+**Action (UI steps):**
+
+1. Go to https://smith.langchain.com → **Projects** → **rag-eval-lab**
+2. Click the **Experiments** tab in the left sidebar or project nav
+3. You should see at least two experiment rows — one from each DeepEval run
+4. Check the checkbox next to both experiments
+5. Click **Compare** (button appears in the top right when two are selected)
+
+**What to look for in the comparison view:**
+
+| Thing to check | What it means |
+|---------------|---------------|
+| "Pulse" question scores low in both runs | Real pipeline problem — retrieval gap (see TEST_RUNBOOK TR-04) |
+| Faithfulness differs significantly between runs | Judge quality is the variable, not the pipeline |
+| Contextual Precision similar in both runs | This metric is objective; good signal regardless of judge |
+| A question passes in one run but fails in the other | Local judge is unreliable for that metric |
+
+**Evaluate / Verify:**
+- At least two experiments appear in the list
+- The comparison table shows per-question scores in columns, one per experiment
+- You can click any row to drill into the individual trace for that question
+
+**What you are learning:** When two judges disagree on a score, the
+higher-quality judge (Gemini) is more likely correct. The comparison tells you
+which metrics to trust from the local-judge run and which required a stronger judge
+to evaluate reliably.
+
+---
+
+## Step 14 — RAGAS Evaluation (Optional / Cross-Validation)
+
+**Purpose:** Run a second framework (RAGAS) on the same four metrics to
+cross-validate the DeepEval scores from Steps 9 and 12. If RAGAS and DeepEval
+agree within 0.10, the signal is reliable. If they disagree by more than 0.15,
+investigate — different frameworks define metrics subtly differently.
+
+**Action:**
+```bash
+python3 src/eval_ragas.py
+```
+
+**Expected output (scores between 0 and 1):**
+```
+===== RAGAS SCORES =====
+faithfulness: X.XX
+answer_relevancy: X.XX
+context_precision: X.XX
+context_recall: X.XX
+```
+
+**Evaluate / Verify:**
+- Compare each score against the corresponding DeepEval metric from Step 12
+- Agreement within 0.10 → signal is reliable for that metric
+- Disagreement > 0.15 → one framework or its judge calls are hitting a limit or
+  interpreting the metric differently; check for `NaN` values (quota issue)
+
+**If you see `NaN`:** Gemini quota is exhausted. Set `USE_LOCAL_JUDGE=1` in
+`.env` or wait for the quota to reset.
+
+---
+
+## Step 15 — Extend the Golden Dataset
+
+**Purpose:** Practice writing your own evaluation cases — the skill that
+transfers to every AI system you will test in future.
+
+**Action:**
 Open `eval/golden_qa.json` and add at least three new entries:
 
-- One in-corpus question about a fact in the handbook you haven't tested yet
-- One multi-fact question that requires two separate chunks to answer correctly
-- One out-of-corpus trap (a plausible-sounding question with no answer in the handbook)
+1. An **in-corpus** question about a fact in the handbook not yet tested
+2. A **multi-fact** question that requires two separate handbook sections to
+   answer correctly
+3. An **out-of-corpus trap** — a plausible question with no answer in the handbook
 
-Then re-run Steps 8 and 9 and observe how your scores change.
+Then re-run Steps 8 and 9 and observe how scores change.
 
-**What you are learning:** You have now authored an eval suite. The discipline of
-deciding *what* to test — not just running someone else's metrics — is the skill
-that transfers to every AI system you will test in the future.
+**Evaluate / Verify:**
+- New in-corpus questions: retrieval should succeed if the fact is clearly
+  stated in the handbook
+- New out-of-corpus questions: model must abstain (`"I don't know based on the
+  handbook."`) — if it does not, the grounding prompt needs investigation
+- Update the LangSmith dataset (Step 10) with the new examples so future
+  experiments run against the full set
+
+**What you are learning:** Deciding *what* to test is harder than running the
+metrics. An eval suite is only as good as its cases.
 
 ---
 
-## Quick reference
+## Quick Reference
 
-| Script | Depends on | Requires |
-|--------|-----------|---------|
-| `ingest.py` | `data/zephyr_handbook.md`, Ollama running | — |
-| `rag_chain.py` | `chroma_db/` (run ingest first) | Ollama running |
-| `agent.py` | `chroma_db/` (run ingest first) | Ollama running |
-| `eval_custom.py` | `chroma_db/`, `eval/golden_qa.json` | Ollama + `GOOGLE_API_KEY` (or `USE_LOCAL_JUDGE=1`) |
-| `eval_ragas.py` | `chroma_db/`, `eval/golden_qa.json` | Ollama + `GOOGLE_API_KEY` (or `USE_LOCAL_JUDGE=1`) |
-| `eval_deepeval.py` | `chroma_db/`, `eval/golden_qa.json` | Ollama + `GOOGLE_API_KEY` (or `USE_LOCAL_JUDGE=1`) |
+| Step | Action | Runs in | Requires |
+|------|--------|---------|---------|
+| 0 | Check tools | Terminal | — |
+| 1 | `ollama serve` | Terminal (keep open) | — |
+| 2 | `ollama pull llama3.1:8b && ollama pull nomic-embed-text` | Terminal | Ollama running |
+| 3 | `pip install -r requirements.txt` | Terminal | Python 3.10+ |
+| 4 | Fill in `.env` | Text editor | Google + LangSmith accounts |
+| 5 | `python3 src/ingest.py` | Terminal | Ollama running |
+| 6 | `python3 src/rag_chain.py "..."` | Terminal | `chroma_db/` built |
+| 7 | `python3 src/agent.py "..."` | Terminal | `chroma_db/` built |
+| 8 | `python3 src/eval_custom.py` | Terminal | Ollama + `GOOGLE_API_KEY` |
+| 9 | `USE_LOCAL_JUDGE=1 python3 src/eval_deepeval.py` | Terminal | Ollama |
+| 10 | Upload `eval/golden_qa.json` | LangSmith UI | `LANGSMITH_API_KEY` |
+| 11 | Create online evaluators | LangSmith UI | `LANGSMITH_API_KEY` + `GOOGLE_API_KEY` |
+| 12 | `python3 src/eval_deepeval.py` | Terminal | `GOOGLE_API_KEY` (quota needed) |
+| 13 | Compare experiments | LangSmith UI | Steps 9 + 12 done |
+| 14 | `python3 src/eval_ragas.py` (optional) | Terminal | `GOOGLE_API_KEY` |
+| 15 | Edit `eval/golden_qa.json` | Text editor | — |
