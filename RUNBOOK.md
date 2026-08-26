@@ -492,11 +492,18 @@ settings).
      Respond with only a JSON object: {{"score": <number between 0 and 1>}}
      ```
    - Same model and sampling settings
-   - **Model:** select a Gemini model (e.g. Gemini 2.0 Flash)
-   - **Response Format field:** `score`
-   - **Sampling rate:** 100% (score every trace)
-   - **Note:Map the Question to the input field (based on Dataset Config) and the Answer to the reference output field (based on Dataset Config)and score to the Score field from Feedback configuration.**
-   - Click **Save**
+
+**Field mapping in the evaluator UI:**
+
+After the code change in `rag_chain.py` (commit: "Add @traceable wrapper"),
+each run creates a span named **`rag-answer`** with:
+- **Input:** `{"question": "How much does the Pro plan cost?", "k": 3}`
+- **Output:** `"The Pro plan costs $49 per seat per month."` (plain string)
+
+In the evaluator field mapping dialog, select:
+- `{input}` → **question** (from the inputs object)
+- `{output}` → **Run Output** (the plain string — no nested key to navigate)
+
 **Evaluate / Verify:**
 - Both evaluators appear in the Rules/Automations tab with status **Active**
 - Run one manual question to trigger a trace:
@@ -504,7 +511,8 @@ settings).
   python3 src/rag_chain.py "How much does the Pro plan cost?"
   ```
 - Go to **Projects** → **rag-eval-lab** → **Traces**
-- Open the new trace → scroll to the **Feedback** or **Scores** section
+- Look for a trace named **`rag-answer`** (not `RunnableSequence`)
+- Open it → scroll to the **Feedback** or **Scores** section
 - Within ~30 seconds you should see `Faithfulness` and `Answer Relevancy`
   scores populated by the evaluators
 

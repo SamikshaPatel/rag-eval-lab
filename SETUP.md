@@ -39,7 +39,7 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-**Gemini 3.6 Flash (required for eval, or use local fallback)**
+**Gemini 3.6 Flash (required for eval judge, or use local fallback)**
 
 `eval_custom.py`, `eval_ragas.py`, and `eval_deepeval.py` all use
 `gemini-3.6-flash` as the LLM judge by default.
@@ -54,13 +54,14 @@ installed via Ollama). Scores will be noisier but the scripts still run.
 
 Without a key and without `USE_LOCAL_JUDGE=1`, the eval scripts will error.
 
-**LangSmith (optional — for tracing)**
+**LangSmith (optional — for tracing and eval UI)**
 
 1. Sign up at https://smith.langchain.com (free Developer tier, no card).
 2. Create an API key under Settings → API Keys.
 3. Paste it into `.env` as `LANGSMITH_API_KEY=your_key_here`.
 
-Skipping LangSmith is fine — the code still runs, you just won't get traces.
+Skipping LangSmith is fine — the code still runs, you just won't get traces or the
+Experiments comparison UI. Steps 10-13 in RUNBOOK.md cover the LangSmith eval workflow.
 
 ## 5. Run the project in order
 
