@@ -492,6 +492,11 @@ settings).
      Respond with only a JSON object: {{"score": <number between 0 and 1>}}
      ```
    - Same model and sampling settings
+   - **Model:** select a Gemini model (e.g. Gemini 2.0 Flash)
+   - **Response Format field:** `score`
+   - **Sampling rate:** 100% (score every trace)
+   - **Note:Map the Question to the input field (based on Dataset Config) and the Answer to the reference output field (based on Dataset Config)and score to the Score field from Feedback configuration.**
+   - Click **Save**
 
 **Field mapping in the evaluator UI:**
 
