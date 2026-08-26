@@ -417,7 +417,7 @@ https://smith.langchain.com.
 **Action (UI steps):**
 
 1. Go to https://smith.langchain.com
-2. In the left sidebar, click **Datasets & Testing**
+2. In the left sidebar, click **Datasets & Experiments**
 3. Click **+ New Dataset** (top right button)
 4. Fill in:
    - **Name:** `rag-eval-golden`
@@ -425,11 +425,11 @@ https://smith.langchain.com.
    - **Dataset type:** leave as default (key-value)
 5. Click **Create Dataset**
 6. On the dataset detail page, click **+ Add examples** → **Upload file**
-7. Upload the file `eval/golden_qa.json` from your local machine
+7. Upload the file `eval/golden_qa.jsonl` from your local machine
 8. In the field mapping step:
    - Set **Input** to `question`
    - Set **Output** (expected) to `reference`
-   - Other fields (`in_corpus`, `must_contain`, `note`) will appear as metadata
+   - Other fields (`in_corpus`, `must_contain`, `note`) set as metadata
 9. Click **Submit** / **Confirm**
 
 **Evaluate / Verify:**
@@ -466,32 +466,37 @@ settings).
      ```
      You are evaluating a RAG system answer.
 
-     Question: {input}
-     Answer: {output}
+     Question: {{input}} 
+     Answer: {{output}}
 
      Score from 0.0 to 1.0: is every claim in the answer directly supported
      by the retrieved context, with nothing added beyond what the context says?
 
-     Respond with only a JSON object: {"score": <number between 0 and 1>}
+     Respond with only a JSON object: {{"Score": <number between 0 and 1>}}
      ```
    - **Model:** select a Gemini model (e.g. Gemini 2.0 Flash)
-   - **Score field:** `score`
+   - **Response Format field:** `score`
    - **Sampling rate:** 100% (score every trace)
+   - **Note:Map the Question to the input field (based on Dataset Config) and the Answer to the reference output field (based on Dataset Config)and score to the Score field from Feedback configuration.**
 5. Click **Save**
 6. Repeat to add a second evaluator — **Answer Relevancy**:
    - **Name:** `Answer Relevancy`
    - **Prompt template:**
      ```
-     Question: {input}
-     Answer: {output}
+     Question: {{input}} 
+     Answer: {{output}}
 
      Score from 0.0 to 1.0: does the answer directly and completely address
      the question? A score of 1.0 means fully on-topic and complete.
 
-     Respond with only a JSON object: {"score": <number between 0 and 1>}
+     Respond with only a JSON object: {{"score": <number between 0 and 1>}}
      ```
    - Same model and sampling settings
-
+   - **Model:** select a Gemini model (e.g. Gemini 2.0 Flash)
+   - **Response Format field:** `score`
+   - **Sampling rate:** 100% (score every trace)
+   - **Note:Map the Question to the input field (based on Dataset Config) and the Answer to the reference output field (based on Dataset Config)and score to the Score field from Feedback configuration.**
+   - Click **Save**
 **Evaluate / Verify:**
 - Both evaluators appear in the Rules/Automations tab with status **Active**
 - Run one manual question to trigger a trace:
