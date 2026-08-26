@@ -26,6 +26,7 @@ from langchain_chroma import Chroma
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
+from langsmith import traceable
 
 DB_PATH = "./chroma_db"
 EMBED_MODEL = "nomic-embed-text"
@@ -88,14 +89,26 @@ def build_rag_chain(k: int = 3):
     return chain
 
 
+# ---------------------------------------------------------------------------
+# 4. LANGSMITH-TRACED ANSWER FUNCTION
+# @traceable creates a named span whose input is the question string and
+# whose output is the answer string — no nesting, no {"output": ...} wrapper.
+# This is what LangSmith online evaluators target for field mapping.
+# No-op when LANGSMITH_TRACING is not set; safe to call without LangSmith.
+# ---------------------------------------------------------------------------
+@traceable(run_type="chain", name="rag-answer")
+def _generate_answer(question: str, k: int = 3) -> str:
+    chain = build_rag_chain(k=k)
+    return chain.invoke(question)
+
+
 # A helper that returns BOTH the answer and the retrieved contexts.
 # The eval scripts need the contexts to measure retrieval quality, not just
 # the final text. Always instrument the middle of the pipeline, not only the end.
 def answer_with_context(question: str, k: int = 3):
     retriever = get_retriever(k=k)
     contexts = retriever.invoke(question)
-    chain = build_rag_chain(k=k)
-    answer = chain.invoke(question)
+    answer = _generate_answer(question, k=k)
     return answer, [c.page_content for c in contexts]
 
 
