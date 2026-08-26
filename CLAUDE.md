@@ -25,6 +25,9 @@ python3 src/eval_custom.py                   # Run hand-rolled eval harness
 python3 src/eval_ragas.py                    # Run RAGAS evaluation
 USE_LOCAL_JUDGE=1 python3 src/eval_deepeval.py  # Run DeepEval (local Ollama judge)
 python3 src/eval_deepeval.py                 # Run DeepEval (Gemini judge)
+USE_LOCAL_JUDGE=1 python3 src/eval_langsmith.py  # Run all golden questions as a LangSmith experiment (local judge)
+python3 src/eval_langsmith.py               # Run LangSmith experiment (Gemini judge)
+python3 src/run_golden_eval.py              # Run golden dataset to trigger LangSmith online evaluator
 
 # Required for eval: copy .env.example → .env and add GOOGLE_API_KEY (Gemini judge)
 # Optional: add USE_LOCAL_JUDGE=1 to .env to use Ollama when Gemini quota is exhausted
@@ -33,7 +36,7 @@ python3 src/eval_deepeval.py                 # Run DeepEval (Gemini judge)
 
 ## Architecture
 
-Five modular scripts form a data-flow pipeline:
+Seven modular scripts form a data-flow pipeline:
 
 ### Data Flow
 ```
@@ -42,6 +45,7 @@ data/zephyr_handbook.md
     → chroma_db/ (persisted vector store)
     → rag_chain.py (retrieve + generate)
     → eval_custom.py / eval_ragas.py / eval_deepeval.py (evaluate)
+    → eval_langsmith.py / run_golden_eval.py (LangSmith experiments)
          ↑ also tested via agent.py (tool routing)
 ```
 
@@ -58,6 +62,10 @@ data/zephyr_handbook.md
 **`src/eval_ragas.py`** — RAGAS evaluation using `gemini-3.6-flash` as the judge via `LangchainLLMWrapper(ChatGoogleGenerativeAI(...))`. Computes faithfulness, answer relevancy, context precision, and context recall. Embeddings still use local Ollama (`nomic-embed-text`). Set `USE_LOCAL_JUDGE=1` to use Ollama instead.
 
 **`src/eval_deepeval.py`** — DeepEval evaluation: same four metrics as RAGAS but pytest-style (each question is an `LLMTestCase`). Makes fewer LLM sub-calls per metric than RAGAS. Judge is `gemini-3.6-flash` by default; set `USE_LOCAL_JUDGE=1` to fall back to `llama3.1:8b` via `OllamaModel`. Baseline results (local judge): Contextual Precision 0.83, Answer Relevancy 0.83, Faithfulness 0.58, Contextual Recall 0.51.
+
+**`src/eval_langsmith.py`** — LangSmith experiment runner. Creates the `zephyr-golden-qa` dataset in LangSmith from `eval/golden_qa.json` (idempotent — skips if already exists), then runs all 8 questions as a named experiment, logging faithfulness, answer relevancy, and abstention scores per question via DeepEval. Each run creates a new experiment so scores can be compared across pipeline changes in the LangSmith UI. Uses Gemini judge by default; set `USE_LOCAL_JUDGE=1` for Ollama.
+
+**`src/run_golden_eval.py`** — Minimal golden-dataset runner for LangSmith's online evaluator. Runs all 8 questions through `answer_with_context` as a LangSmith experiment with no local judge — relies on LangSmith's configured Answer Relevancy online evaluator (set up in the UI) to score traces automatically. Use this when you want LangSmith to handle scoring rather than a local DeepEval/RAGAS judge.
 
 ### Golden Dataset
 

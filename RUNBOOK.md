@@ -615,7 +615,98 @@ to evaluate reliably.
 
 ---
 
-## Step 14 — RAGAS Evaluation (Optional / Cross-Validation)
+## Step 14 — LangSmith Experiment: Full Golden Dataset with DeepEval Scores
+
+**Purpose:** Programmatically create the `zephyr-golden-qa` dataset in LangSmith
+and run all 8 golden questions as a named experiment. Faithfulness, answer
+relevancy, and abstention scores are logged to LangSmith per question via
+DeepEval. Each run of this script creates a new experiment — so you can compare
+scores before and after any pipeline change directly in the LangSmith UI.
+
+**Prerequisite:** `LANGSMITH_API_KEY` set in `.env`. Ollama running.
+Gemini quota available, or use `USE_LOCAL_JUDGE=1` for the local judge.
+
+**Action:**
+```bash
+# With Gemini judge (requires GOOGLE_API_KEY and quota)
+python3 src/eval_langsmith.py
+
+# With local Ollama judge (free, no quota — use when Gemini is exhausted)
+USE_LOCAL_JUDGE=1 python3 src/eval_langsmith.py
+```
+
+**Expected output:**
+```
+[dataset] 'zephyr-golden-qa' already exists — reusing.   # or "Creating..." on first run
+[judge] Using local Ollama model: llama3.1:8b
+
+Running LangSmith experiment...
+View the evaluation results for experiment: 'golden-eval-XXXXXXXX' at:
+https://smith.langchain.com/o/.../datasets/.../compare?selectedSessions=...
+
+8it [05:01, 37.71s/it]
+```
+
+**Evaluate / Verify:**
+- Open the printed LangSmith URL — the experiment appears under
+  **Datasets & Experiments → zephyr-golden-qa**
+- Each of the 8 rows shows `faithfulness`, `answer_relevancy`, and `abstention`
+  score columns
+- Run the script a second time after changing a prompt or `k` value — a new
+  experiment is created and you can compare the two in LangSmith's comparison view
+
+**Note:** Dataset creation is idempotent — if `zephyr-golden-qa` already exists
+in LangSmith, the script reuses it. Only the experiment (the run) is new each time.
+
+---
+
+## Step 15 — LangSmith Online Evaluator: Run Golden Dataset
+
+**Purpose:** Run all 8 golden questions through the RAG pipeline as a LangSmith
+experiment with **no local judge**. LangSmith's configured online evaluator
+(Answer Relevancy, set up in Step 11) scores each trace automatically. This
+separates the scoring concern from the pipeline — you don't need Gemini quota
+locally; LangSmith handles it on its side.
+
+**Prerequisite:** Step 11 (online evaluator configured in LangSmith UI) and
+`LANGSMITH_API_KEY` set in `.env`. Ollama running.
+
+**Action:**
+```bash
+python3 src/run_golden_eval.py
+```
+
+**Expected output:**
+```
+[dataset] 'zephyr-golden-qa' already exists — reusing.
+
+Running golden dataset — LangSmith online evaluator will score answer relevancy...
+
+View the evaluation results for experiment: 'golden-answer-relevancy-XXXXXXXX' at:
+https://smith.langchain.com/o/.../datasets/.../compare?selectedSessions=...
+
+8it [00:19,  2.04s/it]
+
+Scores available in LangSmith:
+  smith.langchain.com → Datasets & Experiments → zephyr-golden-qa
+```
+
+**Evaluate / Verify:**
+- Open the LangSmith URL — the experiment appears under
+  **Datasets & Experiments → zephyr-golden-qa**
+- Wait ~30 seconds after the script completes — the online evaluator fires
+  asynchronously and populates the `Answer Relevancy` score column
+- Compare this experiment against the DeepEval experiment from Step 14:
+  scores should be directionally similar; large gaps reveal judge differences
+
+**If scores don't appear after 60 seconds:**
+- Confirm the Answer Relevancy online evaluator is **Active** in
+  LangSmith → **Projects** → **rag-eval-lab** → **Rules / Automations**
+- Check that it is configured to fire on traces in the correct project
+
+---
+
+## Step 16 — RAGAS Evaluation (Optional / Cross-Validation)
 
 **Purpose:** Run a second framework (RAGAS) on the same four metrics to
 cross-validate the DeepEval scores from Steps 9 and 12. If RAGAS and DeepEval
@@ -647,7 +738,7 @@ context_recall: X.XX
 
 ---
 
-## Step 15 — Extend the Golden Dataset
+## Step 17 — Extend the Golden Dataset
 
 **Purpose:** Practice writing your own evaluation cases — the skill that
 transfers to every AI system you will test in future.
@@ -693,5 +784,7 @@ metrics. An eval suite is only as good as its cases.
 | 11 | Create online evaluators | LangSmith UI | `LANGSMITH_API_KEY` + `GOOGLE_API_KEY` |
 | 12 | `python3 src/eval_deepeval.py` | Terminal | `GOOGLE_API_KEY` (quota needed) |
 | 13 | Compare experiments | LangSmith UI | Steps 9 + 12 done |
-| 14 | `python3 src/eval_ragas.py` (optional) | Terminal | `GOOGLE_API_KEY` |
-| 15 | Edit `eval/golden_qa.json` | Text editor | — |
+| 14 | `USE_LOCAL_JUDGE=1 python3 src/eval_langsmith.py` | Terminal | Ollama + `LANGSMITH_API_KEY` |
+| 15 | `python3 src/run_golden_eval.py` | Terminal | Ollama + `LANGSMITH_API_KEY` + online evaluator active |
+| 16 | `python3 src/eval_ragas.py` (optional) | Terminal | `GOOGLE_API_KEY` |
+| 17 | Edit `eval/golden_qa.json` | Text editor | — |

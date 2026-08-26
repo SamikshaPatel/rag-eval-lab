@@ -69,6 +69,8 @@ Read the files in this order. Each one is heavily commented with the "why".
 | **Context recall** | `src/eval_ragas.py` / `src/eval_deepeval.py` | Retriever *misses* — needed facts not fetched |
 | **Eval framework trade-offs** | `src/eval_deepeval.py` vs `src/eval_ragas.py` | Same metrics, different frameworks — compare pass rates to understand tool variance |
 | **Local vs cloud judge** | `eval_deepeval.py` (`USE_LOCAL_JUDGE=1`) | When Gemini quota runs out, Ollama judge shows quality vs cost trade-off |
+| **LangSmith experiments** | `src/eval_langsmith.py` | Creates the golden dataset in LangSmith programmatically and runs a named experiment — each run is stored so you can compare faithfulness/relevancy scores across code changes |
+| **LangSmith online evaluator** | `src/run_golden_eval.py` | Runs all 8 golden questions as a LangSmith experiment with no local judge — LangSmith's configured Answer Relevancy evaluator scores the traces automatically |
 | **Tracing / observability** | any script + LangSmith | For agents, the trace is the only way to tell a lucky answer from a correct process |
 
 ---
@@ -92,7 +94,12 @@ Read the files in this order. Each one is heavily commented with the "why".
    by a different framework against your RAGAS scores. If Gemini quota is
    exhausted, set `USE_LOCAL_JUDGE=1` and run with the local model — then
    compare judge quality as a bonus lesson.
-8. **Day 8** — Add three of your own questions to `golden_qa.json`, including
+8. **Day 8** — Run `eval_langsmith.py`. This creates the `zephyr-golden-qa`
+   dataset in LangSmith programmatically and runs a named experiment. Then run
+   `run_golden_eval.py` to trigger LangSmith's configured online evaluator
+   (Answer Relevancy) on all 8 questions. Compare experiments side-by-side in
+   the LangSmith UI — this is how you track score changes across code iterations.
+9. **Day 9** — Add three of your own questions to `golden_qa.json`, including
    one more out-of-corpus trap. You have now authored an eval suite.
 
 ---
