@@ -2,8 +2,8 @@
 
 One tiny project that combines **Step 5 (RAG)**, **Step 6 (Agents & tool use)**,
 and **Step 7 (Evaluation)** from your AI-testing plan. RAG and agents run
-entirely on your machine. Evaluation uses **Gemini 2.5 Flash** as the LLM judge
-(free API key required) and an optional free LangSmith account for tracing.
+entirely on your machine. Evaluation uses **Gemini 3.6 Flash** as the LLM judge
+(free API key required) and an optional free LangSmith account for tracing and eval UI.
 
 The thing you are really learning: **how to test a system that gives a
 different answer every time you run it.** That is the discipline that separates
