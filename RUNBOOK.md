@@ -460,30 +460,11 @@ settings).
 2. Click the **Rules** tab (may appear as **Automations** or **Evaluators**
    depending on your LangSmith version)
 3. Click **+ New Rule** → choose **LLM-as-Judge**
-4. Configure the first evaluator — **Faithfulness**:
-   - **Name:** `Faithfulness`
-   - **Prompt template:**
-     ```
-     You are evaluating a RAG system answer.
-
-     Question: {{input}} 
-     Answer: {{output}}
-
-     Score from 0.0 to 1.0: is every claim in the answer directly supported
-     by the retrieved context, with nothing added beyond what the context says?
-
-     Respond with only a JSON object: {{"Score": <number between 0 and 1>}}
-     ```
-   - **Model:** select a Gemini model (e.g. Gemini 2.0 Flash)
-   - **Response Format field:** `score`
-   - **Sampling rate:** 100% (score every trace)
-   - **Note:Map the Question to the input field (based on Dataset Config) and the Answer to the reference output field (based on Dataset Config)and score to the Score field from Feedback configuration.**
-5. Click **Save**
-6. Repeat to add a second evaluator — **Answer Relevancy**:
+4. Configure the first evaluator — **Answer Relevancy**:
    - **Name:** `Answer Relevancy`
    - **Prompt template:**
      ```
-     Question: {{input}} 
+      Question: {{input}} 
      Answer: {{output}}
 
      Score from 0.0 to 1.0: does the answer directly and completely address
@@ -491,12 +472,11 @@ settings).
 
      Respond with only a JSON object: {{"score": <number between 0 and 1>}}
      ```
-   - Same model and sampling settings
    - **Model:** select a Gemini model (e.g. Gemini 2.0 Flash)
    - **Response Format field:** `score`
    - **Sampling rate:** 100% (score every trace)
    - **Note:Map the Question to the input field (based on Dataset Config) and the Answer to the reference output field (based on Dataset Config)and score to the Score field from Feedback configuration.**
-   - Click **Save**
+5. Click **Save**
 
 **Field mapping in the evaluator UI:**
 
