@@ -36,10 +36,25 @@ from deepeval.models import DeepEvalBaseLLM
 
 # Reuse constants and the traced answer function from rag_chain
 sys.path.insert(0, os.path.dirname(__file__))
-from rag_chain import answer_with_context, JUDGE_MODEL, LOCAL_JUDGE_MODEL
+from rag_chain import (
+    answer_with_context, JUDGE_MODEL, LOCAL_JUDGE_MODEL,
+    CHAT_MODEL, EMBED_MODEL,
+)
 
 DATASET_NAME = "zephyr-golden-qa"
 GOLDEN_PATH = "eval/golden_qa.json"
+
+# ---------------------------------------------------------------------------
+# Pipeline parameters — edit these to run a different configuration.
+# Each value is logged to LangSmith as experiment metadata so you can filter
+# and compare runs across configurations in the UI (Columns → metadata.*).
+# ---------------------------------------------------------------------------
+RETRIEVAL_K = 3           # chunks fetched per query
+CHUNK_SIZE = 400          # characters per chunk (must match ingest.py)
+CHUNK_OVERLAP = 80        # overlap between chunks (must match ingest.py)
+TEMPERATURE = 0.0         # generation temperature (0 = most deterministic)
+FAITHFULNESS_THRESHOLD = 0.7
+RELEVANCY_THRESHOLD = 0.7
 
 ABSTENTION_MARKERS = [
     "don't know", "do not know", "not in", "no information",
@@ -110,7 +125,7 @@ def ensure_dataset(client: Client, golden: list) -> str:
 # ---------------------------------------------------------------------------
 def rag_target(inputs: dict) -> dict:
     question = inputs["question"]
-    answer, contexts = answer_with_context(question)
+    answer, contexts = answer_with_context(question, k=RETRIEVAL_K)
     return {"answer": answer, "contexts": contexts}
 
 
@@ -133,7 +148,7 @@ def make_faithfulness_evaluator(judge):
             expected_output=reference,
             retrieval_context=contexts,
         )
-        metric = FaithfulnessMetric(threshold=0.7, model=judge, verbose_mode=False)
+        metric = FaithfulnessMetric(threshold=FAITHFULNESS_THRESHOLD, model=judge, verbose_mode=False)
         metric.measure(case)
         return {"key": "faithfulness", "score": metric.score}
 
@@ -143,7 +158,7 @@ def make_faithfulness_evaluator(judge):
 def make_relevancy_evaluator(judge):
     def relevancy_evaluator(run, example) -> dict:
         if not example.inputs.get("in_corpus", True):
-            return {"key": "answer_relevancy", "score": None, "comment": "skipped — out-of-corpus"}
+            return {"key": "de_answer_relevancy", "score": None, "comment": "skipped — out-of-corpus"}
 
         answer = run.outputs["answer"]
         contexts = run.outputs["contexts"]
@@ -156,9 +171,9 @@ def make_relevancy_evaluator(judge):
             expected_output=reference,
             retrieval_context=contexts,
         )
-        metric = AnswerRelevancyMetric(threshold=0.7, model=judge, verbose_mode=False)
+        metric = AnswerRelevancyMetric(threshold=RELEVANCY_THRESHOLD, model=judge, verbose_mode=False)
         metric.measure(case)
-        return {"key": "answer_relevancy", "score": metric.score}
+        return {"key": "de_answer_relevancy", "score": metric.score}
 
     return relevancy_evaluator
 
@@ -182,8 +197,34 @@ def main():
     ensure_dataset(client, golden)
 
     judge = make_judge()
+    judge_label = "ollama" if os.getenv("USE_LOCAL_JUDGE") == "1" else "gemini"
+    chat_label = CHAT_MODEL.replace(":", "-").replace(".", "_")
 
-    print("\nRunning LangSmith experiment...")
+    # Experiment title encodes the key knobs so each run is self-describing in
+    # the LangSmith UI: k=chunks, chunk size, generation model, judge model.
+    experiment_prefix = (
+        f"k{RETRIEVAL_K}"
+        f"-chunk{CHUNK_SIZE}o{CHUNK_OVERLAP}"
+        f"-{chat_label}"
+        f"-judge-{judge_label}"
+    )
+
+    # All pipeline parameters are logged as metadata columns in LangSmith.
+    # In the UI: open an experiment → Columns → metadata.<key> to add them.
+    experiment_metadata = {
+        "retrieval_k": RETRIEVAL_K,
+        "chunk_size": CHUNK_SIZE,
+        "chunk_overlap": CHUNK_OVERLAP,
+        "embed_model": EMBED_MODEL,
+        "chat_model": CHAT_MODEL,
+        "temperature": TEMPERATURE,
+        "judge_model": LOCAL_JUDGE_MODEL if os.getenv("USE_LOCAL_JUDGE") == "1" else JUDGE_MODEL,
+        "faithfulness_threshold": FAITHFULNESS_THRESHOLD,
+        "relevancy_threshold": RELEVANCY_THRESHOLD,
+    }
+
+    print(f"\nRunning LangSmith experiment: {experiment_prefix!r}")
+    print(f"  Parameters: {experiment_metadata}")
     results = ls_evaluate(
         rag_target,
         data=DATASET_NAME,
@@ -192,7 +233,8 @@ def main():
             make_relevancy_evaluator(judge),
             abstention_evaluator,
         ],
-        experiment_prefix="golden-eval",
+        experiment_prefix=experiment_prefix,
+        metadata=experiment_metadata,
         max_concurrency=1,  # sequential — Ollama is single-threaded
     )
 
@@ -200,19 +242,23 @@ def main():
     print("\n===== RESULTS =====")
     for r in results:
         try:
-            q = r.example.inputs.get("question", "?")
-            eval_results = getattr(r.evaluation_results, "results", []) or []
+            q = r["example"].inputs.get("question", "?")
+            eval_results = (r["evaluation_results"] or {}).get("results", []) or []
             evals = {e.key: e.score for e in eval_results}
             faith = evals.get("faithfulness")
-            relev = evals.get("answer_relevancy")
+            relev = evals.get("de_answer_relevancy")
             abst = evals.get("abstention")
             if faith is not None:
-                print(f"  faithfulness={faith:.2f}  relevancy={relev:.2f}  | {q}")
+                faith_str = f"{faith:.2f}" if faith is not None else "n/a"
+                relev_str = f"{relev:.2f}" if relev is not None else "n/a"
+                print(f"  faithfulness={faith_str}  relevancy={relev_str}  | {q}")
             elif abst is not None:
                 flag = "ABSTAINED" if abst == 1.0 else "HALLUCINATED"
                 print(f"  abstention={flag}  | {q}")
-        except Exception:
-            pass
+            else:
+                print(f"  (no scores — evaluator may have errored)  | {q}")
+        except Exception as e:
+            print(f"  (print error: {e})")
 
     print("\nView experiment in LangSmith:")
     print("  https://smith.langchain.com → Datasets & Experiments → zephyr-golden-qa")
