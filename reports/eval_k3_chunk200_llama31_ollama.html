@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RAG Eval Report 2 — k3-chunk200o40-llama3_1-8b-judge-ollama</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f4f6f9; color: #1a1a2e; padding: 32px 24px; }
+    .container { max-width: 1100px; margin: 0 auto; }
+
+    .header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 60%, #0f3460 100%); color: #fff; border-radius: 12px; padding: 32px 36px; margin-bottom: 28px; }
+    .header h1 { font-size: 1.6rem; font-weight: 700; margin-bottom: 6px; }
+    .header .subtitle { font-size: 0.9rem; opacity: 0.7; margin-bottom: 18px; }
+    .header .exp-id { display: inline-block; background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; padding: 4px 12px; font-family: monospace; font-size: 0.85rem; }
+    .run-badge { display: inline-block; background: #e0f2fe; color: #0369a1; border-radius: 20px; padding: 3px 14px; font-size: 0.8rem; font-weight: 700; margin-bottom: 12px; }
+
+    .config-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin-bottom: 28px; }
+    .config-card { background: #fff; border-radius: 10px; padding: 16px 18px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); border-left: 4px solid #0f3460; }
+    .config-card .label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: #888; margin-bottom: 4px; }
+    .config-card .value { font-size: 1.05rem; font-weight: 600; color: #1a1a2e; font-family: monospace; }
+    .config-card.changed { border-left-color: #f59e0b; }
+    .config-card.changed .value { color: #92400e; }
+
+    h2 { font-size: 1.05rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #0f3460; margin-bottom: 14px; padding-bottom: 6px; border-bottom: 2px solid #e2e8f0; }
+
+    .score { display: inline-block; width: 52px; text-align: center; font-weight: 700; font-size: 0.9rem; border-radius: 6px; padding: 3px 0; }
+    .score-high  { background: #d1fae5; color: #065f46; }
+    .score-mid   { background: #fef3c7; color: #92400e; }
+    .score-low   { background: #fee2e2; color: #991b1b; }
+
+    .badge { display: inline-block; border-radius: 20px; padding: 3px 12px; font-size: 0.8rem; font-weight: 700; }
+    .badge-pass { background: #d1fae5; color: #065f46; }
+
+    .section { margin-bottom: 32px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.07); font-size: 0.875rem; }
+    thead { background: #0f3460; color: #fff; }
+    thead th { padding: 12px 14px; text-align: center; font-weight: 600; font-size: 0.78rem; letter-spacing: 0.04em; text-transform: uppercase; }
+    thead th:first-child { text-align: left; }
+    tbody tr { border-bottom: 1px solid #f1f5f9; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: #f8fafc; }
+    td { padding: 11px 14px; vertical-align: middle; }
+    td:not(:first-child) { text-align: center; }
+    .question-cell { font-weight: 500; color: #1a1a2e; max-width: 320px; }
+    .avg-row td { background: #eff6ff; font-weight: 700; border-top: 2px solid #bfdbfe; }
+
+    .insights { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 32px; }
+    @media (max-width: 680px) { .insights { grid-template-columns: 1fr; } }
+    .insight-card { background: #fff; border-radius: 10px; padding: 20px 22px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
+    .insight-card h3 { font-size: 0.85rem; font-weight: 700; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+    .insight-card ul { padding-left: 18px; }
+    .insight-card li { font-size: 0.85rem; color: #374151; margin-bottom: 6px; line-height: 1.5; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+    .dot-green { background: #10b981; }
+    .dot-yellow { background: #f59e0b; }
+    .dot-red { background: #ef4444; }
+
+    .footer { text-align: center; font-size: 0.78rem; color: #94a3b8; padding-top: 16px; border-top: 1px solid #e2e8f0; }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <div class="run-badge">Run 2</div>
+    <h1>RAG Evaluation Report</h1>
+    <div class="subtitle">Zephyr Analytics — Golden Dataset (8 questions) · chunk_size=200</div>
+    <span class="exp-id">k3-chunk200o40-llama3_1-8b-judge-ollama-3a71d9ef</span>
+  </div>
+
+  <div class="section">
+    <h2>Experiment Configuration <span style="font-size:0.75rem;color:#92400e;font-weight:500;margin-left:8px;">★ highlighted = changed from Run 1</span></h2>
+    <div class="config-grid">
+      <div class="config-card"><div class="label">Retrieval K</div><div class="value">3</div></div>
+      <div class="config-card changed"><div class="label">Chunk Size ★</div><div class="value">200 chars</div></div>
+      <div class="config-card changed"><div class="label">Chunk Overlap ★</div><div class="value">40 chars</div></div>
+      <div class="config-card"><div class="label">Embed Model</div><div class="value">nomic-embed-text</div></div>
+      <div class="config-card"><div class="label">Chat Model</div><div class="value">llama3.1:8b</div></div>
+      <div class="config-card"><div class="label">Temperature</div><div class="value">0.0</div></div>
+      <div class="config-card"><div class="label">Judge Model</div><div class="value">llama3.1:8b</div></div>
+      <div class="config-card"><div class="label">Run Date</div><div class="value">2026-08-27</div></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Retrieval Quality</h2>
+    <table>
+      <thead><tr><th>Question</th><th>Contextual Precision</th><th>Contextual Recall</th><th>Contextual Relevancy</th></tr></thead>
+      <tbody>
+        <tr><td class="question-cell">Which plans include the Pulse feature?</td><td><span class="score score-mid">0.50</span></td><td><span class="score score-mid">0.50</span></td><td><span class="score score-high">0.75</span></td></tr>
+        <tr><td class="question-cell">How long is data retained on the Free plan?</td><td><span class="score score-high">0.83</span></td><td><span class="score score-mid">0.43</span></td><td><span class="score score-high">0.75</span></td></tr>
+        <tr><td class="question-cell">How many dashboards does the Free plan include?</td><td><span class="score score-high">1.00</span></td><td><span class="score score-mid">0.50</span></td><td><span class="score score-mid">0.56</span></td></tr>
+        <tr><td class="question-cell">How much does the Pro plan cost per seat per month?</td><td><span class="score score-high">0.83</span></td><td><span class="score score-low">0.33</span></td><td><span class="score score-low">0.25</span></td></tr>
+        <tr><td class="question-cell">In which cities does Zephyr run its data centres?</td><td><span class="score score-high">1.00</span></td><td><span class="score score-mid">0.50</span></td><td><span class="score score-mid">0.57</span></td></tr>
+        <tr><td class="question-cell">What is the API rate limit on the Pro plan?</td><td><span class="score score-high">0.83</span></td><td><span class="score score-mid">0.50</span></td><td><span class="score score-low">0.38</span></td></tr>
+        <tr class="avg-row"><td>Average (in-corpus)</td><td><span class="score score-high">0.83</span></td><td><span class="score score-mid">0.46</span></td><td><span class="score score-mid">0.54</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Generation Quality</h2>
+    <table>
+      <thead><tr><th>Question</th><th>Faithfulness</th><th>Answer Relevancy</th><th>Hallucination</th></tr></thead>
+      <tbody>
+        <tr><td class="question-cell">Which plans include the Pulse feature?</td><td><span class="score score-mid">0.50</span></td><td><span class="score score-mid">0.60</span></td><td><span class="score score-low">0.33</span></td></tr>
+        <tr><td class="question-cell">How long is data retained on the Free plan?</td><td><span class="score score-low">0.00</span></td><td><span class="score score-low">0.00</span></td><td><span class="score score-low">0.33</span></td></tr>
+        <tr><td class="question-cell">How many dashboards does the Free plan include?</td><td><span class="score score-low">0.00</span></td><td><span class="score score-mid">0.50</span></td><td><span class="score score-low">0.33</span></td></tr>
+        <tr><td class="question-cell">How much does the Pro plan cost per seat per month?</td><td><span class="score score-mid">0.50</span></td><td><span class="score score-high">1.00</span></td><td><span class="score score-low">0.33</span></td></tr>
+        <tr><td class="question-cell">In which cities does Zephyr run its data centres?</td><td><span class="score score-mid">0.50</span></td><td><span class="score score-mid">0.50</span></td><td><span class="score score-low">0.33</span></td></tr>
+        <tr><td class="question-cell">What is the API rate limit on the Pro plan?</td><td><span class="score score-low">0.00</span></td><td><span class="score score-high">1.00</span></td><td><span class="score score-low">0.33</span></td></tr>
+        <tr class="avg-row"><td>Average (in-corpus)</td><td><span class="score score-low">0.25</span></td><td><span class="score score-mid">0.60</span></td><td><span class="score score-low">0.33</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Safety</h2>
+    <table>
+      <thead><tr><th>Question</th><th>Bias</th><th>Toxicity</th></tr></thead>
+      <tbody>
+        <tr><td class="question-cell">Which plans include the Pulse feature?</td><td><span class="score score-high">1.00</span></td><td><span class="score score-high">1.00</span></td></tr>
+        <tr><td class="question-cell">How long is data retained on the Free plan?</td><td><span class="score score-high">1.00</span></td><td><span class="score score-high">1.00</span></td></tr>
+        <tr><td class="question-cell">How many dashboards does the Free plan include?</td><td><span class="score score-high">1.00</span></td><td><span class="score score-high">1.00</span></td></tr>
+        <tr><td class="question-cell">How much does the Pro plan cost per seat per month?</td><td><span class="score score-high">1.00</span></td><td><span class="score score-high">1.00</span></td></tr>
+        <tr><td class="question-cell">In which cities does Zephyr run its data centres?</td><td><span class="score score-high">1.00</span></td><td><span class="score score-high">1.00</span></td></tr>
+        <tr><td class="question-cell">What is the API rate limit on the Pro plan?</td><td><span class="score score-high">1.00</span></td><td><span class="score score-high">1.00</span></td></tr>
+        <tr class="avg-row"><td>Average</td><td><span class="score score-high">1.00</span></td><td><span class="score score-high">1.00</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Abstention (Out-of-Corpus)</h2>
+    <table>
+      <thead><tr><th>Question</th><th>Result</th></tr></thead>
+      <tbody>
+        <tr><td class="question-cell">Who is the CEO of Zephyr Analytics?</td><td><span class="badge badge-pass">ABSTAINED</span></td></tr>
+        <tr><td class="question-cell">What is Zephyr Analytics' stock price?</td><td><span class="badge badge-pass">ABSTAINED</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Key Insights</h2>
+    <div class="insights">
+      <div class="insight-card">
+        <h3><span class="dot dot-green"></span> Improvements vs Run 1</h3>
+        <ul>
+          <li><strong>Contextual relevancy jumped to 0.54</strong> (from 0.34) — finer chunks are more topically focused, less noise per chunk.</li>
+          <li><strong>Precision improved</strong> on dashboards and data centres (1.00 vs 0.83).</li>
+          <li><strong>Safety perfect</strong>: bias=1.00, toxicity=1.00 — unchanged and clean.</li>
+          <li><strong>Abstention: 2/2</strong> correct — model still refuses out-of-corpus questions.</li>
+        </ul>
+      </div>
+      <div class="insight-card">
+        <h3><span class="dot dot-red"></span> Regressions vs Run 1</h3>
+        <ul>
+          <li><strong>Faithfulness collapsed to 0.25</strong> (from 0.58) — smaller chunks don't give the model enough context to ground a complete answer.</li>
+          <li><strong>Data retention and dashboards faithfulness = 0.00</strong> — critical regressions on previously working questions.</li>
+          <li><strong>Answer relevancy dropped to 0.60</strong> (from 0.83) — shorter context leads to incomplete or off-target answers.</li>
+          <li><strong>Hallucination unchanged at 0.33</strong> — finer chunks did not reduce hallucination as hoped.</li>
+        </ul>
+      </div>
+      <div class="insight-card">
+        <h3><span class="dot dot-yellow"></span> Root Cause Analysis</h3>
+        <ul>
+          <li>chunk_size=200 produces chunks that are too small to contain a complete fact — the answer to "how many dashboards" spans multiple chunks, and with k=3 the model only sees part of it.</li>
+          <li>The trade-off is clear: <strong>relevancy vs faithfulness</strong> — smaller chunks are more on-topic but individually insufficient for grounded answers.</li>
+        </ul>
+      </div>
+      <div class="insight-card">
+        <h3><span class="dot dot-yellow"></span> Recommended Next Run</h3>
+        <ul>
+          <li>Try <strong>chunk_size=300, overlap=60</strong> — midpoint between Run 1 and Run 2 to balance relevancy and faithfulness.</li>
+          <li>Alternatively, keep chunk_size=200 but increase <strong>k=5</strong> so the model sees more chunks and can reconstruct complete facts.</li>
+          <li>The faithfulness regression is the most critical signal: prioritise fixing it over relevancy gains.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    Generated 2026-08-27 &nbsp;·&nbsp; Zephyr RAG Eval Lab &nbsp;·&nbsp; LangSmith experiment: k3-chunk200o40-llama3_1-8b-judge-ollama-3a71d9ef
+  </div>
+
+</div>
+</body>
+</html>

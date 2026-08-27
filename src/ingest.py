@@ -42,8 +42,8 @@ print(f"Loaded {len(docs)} document(s), {len(docs[0].page_content)} characters."
 # non-deterministic system — the core skill you are building.
 # ---------------------------------------------------------------------------
 splitter = RecursiveCharacterTextSplitter(
-    chunk_size=400,      # characters per chunk
-    chunk_overlap=80,    # overlap keeps facts that straddle a boundary intact
+    chunk_size=200,      # characters per chunk
+    chunk_overlap=40,    # overlap keeps facts that straddle a boundary intact
 )
 chunks = splitter.split_documents(docs)
 print(f"Split into {len(chunks)} chunks.")

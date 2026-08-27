@@ -69,8 +69,8 @@ GOLDEN_PATH = "eval/golden_qa.json"
 # and compare runs across configurations in the UI (Columns → metadata.*).
 # ---------------------------------------------------------------------------
 RETRIEVAL_K = 3           # chunks fetched per query
-CHUNK_SIZE = 400          # characters per chunk (must match ingest.py)
-CHUNK_OVERLAP = 80        # overlap between chunks (must match ingest.py)
+CHUNK_SIZE = 200          # characters per chunk (must match ingest.py)
+CHUNK_OVERLAP = 40        # overlap between chunks (must match ingest.py)
 TEMPERATURE = 0.0         # generation temperature (0 = most deterministic)
 
 # Metric thresholds (pass/fail boundary; scores are always logged regardless)
