@@ -188,10 +188,10 @@ ls chroma_db/
 **If this fails:** Ollama is not running or `nomic-embed-text` was not pulled.
 Check Steps 1 and 2.
 
-**Tuning experiment (try later):** Change `chunk_size=400` to `chunk_size=100`
-in `ingest.py`, re-run, then re-run `rag_chain.py` on the same question. Answer
-quality typically drops — this demonstrates chunk size as a tunable variable.
-Reset to 400 when done.
+**Tuning experiment (try later):** Change `CHUNK_SIZE = 400` to `CHUNK_SIZE = 100`
+in `rag_chain.py` (single source of truth for chunk params), re-run `ingest.py`,
+then re-run `rag_chain.py` on the same question. Answer quality typically drops —
+this demonstrates chunk size as a tunable variable. Reset to 400 when done.
 
 ---
 
@@ -368,7 +368,7 @@ USE_LOCAL_JUDGE=1 python3 src/eval_deepeval.py
 
 **Expected output (baseline — your numbers may differ slightly):**
 ```
-[judge] Using local Ollama model: llama3.1:8b
+[judge] Using local Ollama model: qwen2.5:7b
 Running RAG pipeline over golden dataset...
 
 [out] abstention=Y (OK) :: What is Zephyr Analytics' stock price?
@@ -399,7 +399,7 @@ Abstention (no hallucination): 2/2 = 100%
 - **Record these numbers** in TEST_RUNBOOK TR-07 — you will compare them
   against the Gemini run in Step 12
 
-**Note on local judge quality:** `llama3.1:8b` is a weaker judge than Gemini.
+**Note on local judge quality:** `qwen2.5:7b` is a capable local judge but weaker than Gemini.
 It may evaluate faithfulness inconsistently. Steps 10–13 use LangSmith to get
 authoritative, Gemini-judged scores.
 
@@ -618,7 +618,7 @@ USE_LOCAL_JUDGE=1 python3 src/eval_langsmith.py
 **Expected output:**
 ```
 [dataset] 'zephyr-golden-qa' already exists — reusing.   # or "Creating..." on first run
-[judge] Using local Ollama model: llama3.1:8b
+[judge] Using local Ollama model: qwen2.5:7b
 
 Running LangSmith experiment...
 View the evaluation results for experiment: 'golden-eval-XXXXXXXX' at:

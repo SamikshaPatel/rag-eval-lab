@@ -33,7 +33,9 @@ EMBED_MODEL = "nomic-embed-text"
 CHAT_MODEL = "llama3.1:8b"      # a free open model; swap for qwen2.5 or mistral //Qwen3 8B//
 JUDGE_MODEL = "gemini-3.6-flash"  # Gemini judge (20 req/day free tier)
 # Set USE_LOCAL_JUDGE=1 in .env to use Ollama instead (free, no quota)
-LOCAL_JUDGE_MODEL = "llama3.1:8b"
+LOCAL_JUDGE_MODEL = "qwen2.5:7b"
+CHUNK_SIZE = 400      # characters per chunk — change here; ingest.py + eval pick it up automatically
+CHUNK_OVERLAP = 80    # overlap between chunks
 # ---------------------------------------------------------------------------
 # 1. RETRIEVER
 # What you learn: k is how many chunks you fetch. Another tuning knob and

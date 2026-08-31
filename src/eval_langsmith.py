@@ -57,7 +57,7 @@ from deepeval.models import DeepEvalBaseLLM
 sys.path.insert(0, os.path.dirname(__file__))
 from rag_chain import (
     answer_with_context, JUDGE_MODEL, LOCAL_JUDGE_MODEL,
-    CHAT_MODEL, EMBED_MODEL,
+    CHAT_MODEL, EMBED_MODEL, CHUNK_SIZE, CHUNK_OVERLAP,
 )
 
 DATASET_NAME = "zephyr-golden-qa"
@@ -69,8 +69,7 @@ GOLDEN_PATH = "eval/golden_qa.json"
 # and compare runs across configurations in the UI (Columns → metadata.*).
 # ---------------------------------------------------------------------------
 RETRIEVAL_K = 3           # chunks fetched per query
-CHUNK_SIZE = 200          # characters per chunk (must match ingest.py)
-CHUNK_OVERLAP = 40        # overlap between chunks (must match ingest.py)
+# CHUNK_SIZE and CHUNK_OVERLAP are imported from rag_chain — single source of truth
 TEMPERATURE = 0.0         # generation temperature (0 = most deterministic)
 
 # Metric thresholds (pass/fail boundary; scores are always logged regardless)

@@ -234,7 +234,7 @@ observed why single-run AI testing is unreliable.
 USE_LOCAL_JUDGE=1 python3 src/eval_deepeval.py
 ```
 
-**Judge model used:** `llama3.1:8b` (local Ollama — free, no quota)
+**Judge model used:** `qwen2.5:7b` (local Ollama — free, no quota)
 
 **Actual results (baseline run — 2026-08-25):**
 
@@ -296,7 +296,7 @@ Per-question breakdown:
 |---------|-------------|
 | Contextual Precision 0.83 across all questions | Retriever fetches relevant chunks — no noise problem |
 | Contextual Recall 0.51 across all questions | Retriever consistently misses some needed facts — primary bottleneck |
-| Faithfulness 0.58 | `llama3.1:8b` is an inconsistent judge; expect Gemini to score differently |
+| Faithfulness 0.58 | `qwen2.5:7b` is a capable but weaker judge than Gemini; expect Gemini to score differently |
 | Abstention 100% | Grounding holds — no hallucinations on out-of-corpus questions |
 
 **Root cause of low Contextual Recall:** Retriever fetches k=3 chunks. Facts
@@ -432,7 +432,7 @@ UI steps.
 USE_LOCAL_JUDGE=1 python3 src/eval_langsmith.py
 ```
 
-**Judge model used:** `llama3.1:8b` (local Ollama — Gemini quota was exhausted)
+**Judge model used:** `qwen2.5:7b` (local Ollama — Gemini quota was exhausted)
 
 **Pass criteria:**
 - Dataset `zephyr-golden-qa` created (or reused) in LangSmith

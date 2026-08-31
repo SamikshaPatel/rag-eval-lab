@@ -18,9 +18,9 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_ollama import OllamaEmbeddings
 from langchain_chroma import Chroma
 
+from rag_chain import DB_PATH, EMBED_MODEL, CHUNK_SIZE, CHUNK_OVERLAP
+
 DATA_PATH = "data/zephyr_handbook.md"
-DB_PATH = "./chroma_db"
-EMBED_MODEL = "nomic-embed-text"   # a small, free embedding model served by Ollama
 
 # ---------------------------------------------------------------------------
 # 1. LOADING
@@ -42,8 +42,8 @@ print(f"Loaded {len(docs)} document(s), {len(docs[0].page_content)} characters."
 # non-deterministic system — the core skill you are building.
 # ---------------------------------------------------------------------------
 splitter = RecursiveCharacterTextSplitter(
-    chunk_size=200,      # characters per chunk
-    chunk_overlap=40,    # overlap keeps facts that straddle a boundary intact
+    chunk_size=CHUNK_SIZE,
+    chunk_overlap=CHUNK_OVERLAP,
 )
 chunks = splitter.split_documents(docs)
 print(f"Split into {len(chunks)} chunks.")
