@@ -115,31 +115,21 @@ sys.path.insert(0, os.path.dirname(__file__))
 from rag_chain import (
     answer_with_context, JUDGE_MODEL, LOCAL_JUDGE_MODEL,
     CHAT_MODEL, EMBED_MODEL, CHUNK_SIZE, CHUNK_OVERLAP,
-    CORRECTNESS_THRESHOLD, COMPLETENESS_THRESHOLD, _load_prompt,
+    RETRIEVAL_K, TEMPERATURE,
+    FAITHFULNESS_THRESHOLD, RELEVANCY_THRESHOLD,
+    CONTEXTUAL_PRECISION_THRESHOLD, CONTEXTUAL_RECALL_THRESHOLD,
+    CONTEXTUAL_RELEVANCY_THRESHOLD, HALLUCINATION_THRESHOLD,
+    BIAS_THRESHOLD, TOXICITY_THRESHOLD,
+    CORRECTNESS_THRESHOLD, COMPLETENESS_THRESHOLD,
+    PROMPT_JUDGE_CORRECTNESS, PROMPT_JUDGE_COMPLETENESS,
+    _load_prompt,
 )
 
 DATASET_NAME = "zephyr-golden-qa"
-GOLDEN_PATH = "eval/golden_qa.json"
+GOLDEN_PATH  = "eval/golden_qa.json"
 
-# ---------------------------------------------------------------------------
-# Pipeline parameters — edit these to run a different configuration.
-# Each value is logged to LangSmith as experiment metadata so you can filter
-# and compare runs across configurations in the UI (Columns → metadata.*).
-# ---------------------------------------------------------------------------
-RETRIEVAL_K = 3           # chunks fetched per query
-# CHUNK_SIZE and CHUNK_OVERLAP are imported from rag_chain — single source of truth
-TEMPERATURE = 0.0         # generation temperature (0 = most deterministic)
-
-# Metric thresholds (pass/fail boundary; scores are always logged regardless)
-FAITHFULNESS_THRESHOLD = 0.7
-RELEVANCY_THRESHOLD = 0.7
-CONTEXTUAL_PRECISION_THRESHOLD = 0.7
-CONTEXTUAL_RECALL_THRESHOLD = 0.7
-CONTEXTUAL_RELEVANCY_THRESHOLD = 0.7
-HALLUCINATION_THRESHOLD = 0.8  # 1=no hallucination, so higher threshold = stricter
-BIAS_THRESHOLD = 0.8           # 1=no bias, so higher threshold = stricter
-TOXICITY_THRESHOLD = 0.8       # 1=no toxicity, so higher threshold = stricter
-# CORRECTNESS_THRESHOLD and COMPLETENESS_THRESHOLD are imported from rag_chain — single source of truth
+# All pipeline parameters (models, thresholds, chunk settings, prompt filenames)
+# are imported from src/rag_chain.py — the single source of truth.
 
 ABSTENTION_MARKERS = [
     "don't know", "do not know", "not in", "no information",
@@ -363,8 +353,8 @@ def _judge_with_json_fallback(judge, prompt: str) -> float:
     return 0.0
 
 
-_CORRECTNESS_PROMPT = _load_prompt("judge_correctness_v1.txt")
-_COMPLETENESS_PROMPT = _load_prompt("judge_completeness_v1.txt")
+_CORRECTNESS_PROMPT  = _load_prompt(PROMPT_JUDGE_CORRECTNESS)
+_COMPLETENESS_PROMPT = _load_prompt(PROMPT_JUDGE_COMPLETENESS)
 
 
 def make_correctness_evaluator(judge):

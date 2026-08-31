@@ -63,26 +63,34 @@ rag-eval-lab/
 
 **Single source of truth: `src/rag_chain.py`**
 
-All tunable knobs are defined here and imported by every other script. To run a different configuration, change one file only.
+Every tunable knob is defined here and imported by every other script. To run a different configuration, change **one file only** — nothing else needs editing.
 
-| Parameter | Variable | Current value | Effect |
-|---|---|---|---|
-| Chunk size | `CHUNK_SIZE` | `400` chars | Primary retrieval tuning knob — re-run `ingest.py` after changing |
-| Chunk overlap | `CHUNK_OVERLAP` | `80` chars | Prevents facts from being split at chunk boundaries |
-| Embedding model | `EMBED_MODEL` | `nomic-embed-text` | Local Ollama model for vectorisation |
-| Chat model | `CHAT_MODEL` | `llama3.1:8b` | Local Ollama model for RAG generation |
-| Cloud judge model | `JUDGE_MODEL` | `gemini-3.6-flash` | Used when `USE_LOCAL_JUDGE` is not set |
-| Local judge model | `LOCAL_JUDGE_MODEL` | `qwen2.5:7b` | Used when `USE_LOCAL_JUDGE=1` |
-| Correctness threshold | `CORRECTNESS_THRESHOLD` | `0.7` | Pass/fail boundary for Answer Correctness metric |
-| Completeness threshold | `COMPLETENESS_THRESHOLD` | `0.7` | Pass/fail boundary for Answer Completeness metric |
-
-**Eval-specific parameters** (in `src/eval_langsmith.py`):
-
-| Parameter | Variable | Current value |
-|---|---|---|
-| Retrieval k | `RETRIEVAL_K` | `3` chunks per query |
-| Generation temperature | `TEMPERATURE` | `0.0` |
-| Metric thresholds | `FAITHFULNESS_THRESHOLD` etc. | `0.7` / `0.8` |
+| Category | Parameter | Variable | Current value | Effect |
+|---|---|---|---|---|
+| **Storage** | Vector DB path | `DB_PATH` | `./chroma_db` | Where Chroma persists embeddings |
+| **Models** | Embedding model | `EMBED_MODEL` | `nomic-embed-text` | Local Ollama model for vectorisation |
+| **Models** | Chat / generation model | `CHAT_MODEL` | `llama3.1:8b` | Local Ollama model for RAG generation |
+| **Models** | Cloud judge model | `JUDGE_MODEL` | `gemini-3.6-flash` | Used when `USE_LOCAL_JUDGE` is not set |
+| **Models** | Local judge model | `LOCAL_JUDGE_MODEL` | `qwen2.5:7b` | Fallback judge when `USE_LOCAL_JUDGE=1` |
+| **Chunking** | Chunk size | `CHUNK_SIZE` | `400` chars | Primary retrieval tuning knob — re-run `ingest.py` after changing |
+| **Chunking** | Chunk overlap | `CHUNK_OVERLAP` | `80` chars | Prevents facts from being split at chunk boundaries |
+| **Retrieval** | Chunks per query | `RETRIEVAL_K` | `3` | Low k risks misses; high k floods the prompt |
+| **Generation** | Temperature | `TEMPERATURE` | `0.0` | 0 = most deterministic output |
+| **Eval** | Eval repeat count | `REPEATS` | `1` | Bump to 3+ in `eval_custom.py` to measure run-to-run variance |
+| **Prompts** | RAG grounding prompt | `PROMPT_RAG_GROUNDING` | `rag_grounding_v1.txt` | Generation step grounding instruction |
+| **Prompts** | Faithfulness judge prompt | `PROMPT_JUDGE_FAITHFULNESS` | `judge_faithfulness_v1.txt` | Binary PASS/FAIL judge |
+| **Prompts** | Correctness judge prompt | `PROMPT_JUDGE_CORRECTNESS` | `judge_correctness_v1.txt` | Scored factual accuracy judge |
+| **Prompts** | Completeness judge prompt | `PROMPT_JUDGE_COMPLETENESS` | `judge_completeness_v1.txt` | Scored coverage judge |
+| **Thresholds** | Faithfulness | `FAITHFULNESS_THRESHOLD` | `0.7` | Pass/fail boundary |
+| **Thresholds** | Answer relevancy | `RELEVANCY_THRESHOLD` | `0.7` | Pass/fail boundary |
+| **Thresholds** | Contextual precision | `CONTEXTUAL_PRECISION_THRESHOLD` | `0.7` | Pass/fail boundary |
+| **Thresholds** | Contextual recall | `CONTEXTUAL_RECALL_THRESHOLD` | `0.7` | Pass/fail boundary |
+| **Thresholds** | Contextual relevancy | `CONTEXTUAL_RELEVANCY_THRESHOLD` | `0.7` | Pass/fail boundary |
+| **Thresholds** | Hallucination | `HALLUCINATION_THRESHOLD` | `0.8` | Higher = stricter (1 = no hallucination) |
+| **Thresholds** | Bias | `BIAS_THRESHOLD` | `0.8` | Higher = stricter (1 = no bias) |
+| **Thresholds** | Toxicity | `TOXICITY_THRESHOLD` | `0.8` | Higher = stricter (1 = no toxicity) |
+| **Thresholds** | Answer correctness | `CORRECTNESS_THRESHOLD` | `0.7` | Pass/fail boundary |
+| **Thresholds** | Answer completeness | `COMPLETENESS_THRESHOLD` | `0.7` | Pass/fail boundary |
 
 ---
 
@@ -90,16 +98,28 @@ All tunable knobs are defined here and imported by every other script. To run a 
 
 All prompts are in `prompts/`. Each file has a header comment block (stripped at load time) with version, purpose, and variable documentation, followed by a `---` separator and the prompt body.
 
-Prompts are loaded at import time via `_load_prompt(filename)` defined in `src/rag_chain.py`.
+Prompts are loaded at import time via `_load_prompt(filename)` defined in `src/rag_chain.py`. The prompt **filenames** are also constants in `src/rag_chain.py` (e.g. `PROMPT_RAG_GROUNDING = "rag_grounding_v1.txt"`), so upgrading a prompt version means updating one constant — no `.py` logic changes needed.
 
-| Prompt file | Version | Used by | Variable | Function |
+| Prompt file | Filename constant | Used by | Variable | Function |
 |---|---|---|---|---|
-| `rag_grounding_v1.txt` | v1 | `src/rag_chain.py` | `PROMPT` | `build_rag_chain()` — the generation step of the RAG pipeline |
-| `judge_faithfulness_v1.txt` | v1 | `src/eval_custom.py` | `JUDGE_PROMPT` | `llm_judge()` — binary PASS/FAIL grading of answer vs context |
-| `judge_correctness_v1.txt` | v1 | `src/eval_langsmith.py` | `_CORRECTNESS_PROMPT` | `make_correctness_evaluator()` — scores factual accuracy vs reference |
-| `judge_completeness_v1.txt` | v1 | `src/eval_langsmith.py` | `_COMPLETENESS_PROMPT` | `make_completeness_evaluator()` — scores coverage of reference facts |
+| `rag_grounding_v1.txt` | `PROMPT_RAG_GROUNDING` | `src/rag_chain.py` | `PROMPT` | `build_rag_chain()` — the generation step of the RAG pipeline |
+| `judge_faithfulness_v1.txt` | `PROMPT_JUDGE_FAITHFULNESS` | `src/eval_custom.py` | `JUDGE_PROMPT` | `llm_judge()` — binary PASS/FAIL grading of answer vs context |
+| `judge_correctness_v1.txt` | `PROMPT_JUDGE_CORRECTNESS` | `src/eval_langsmith.py` | `_CORRECTNESS_PROMPT` | `make_correctness_evaluator()` — scores factual accuracy vs reference |
+| `judge_completeness_v1.txt` | `PROMPT_JUDGE_COMPLETENESS` | `src/eval_langsmith.py` | `_COMPLETENESS_PROMPT` | `make_completeness_evaluator()` — scores coverage of reference facts |
 
-**To version a prompt:** copy the file to `*_v2.txt`, edit the body and update the `# version:` header, then update the `_load_prompt(...)` call in the relevant `.py` file. Old versions remain on disk for reproducibility.
+**To version a prompt:** copy the file to `*_v2.txt`, edit the body and update the `# version:` header, then change the filename constant in `src/rag_chain.py` (e.g. `PROMPT_JUDGE_CORRECTNESS = "judge_correctness_v2.txt"`). Old versions remain on disk for reproducibility. No other `.py` file needs to change.
+
+---
+
+## Fallback behaviour
+
+Three different fallback mechanisms exist in this project. The table below shows when each kicks in, why it exists, and its trade-offs.
+
+| Fallback | Default (when?) | Fallback (when?) | Why the fallback exists | Trade-off |
+|---|---|---|---|---|
+| **Judge model** | Gemini `gemini-3.6-flash` — used when `USE_LOCAL_JUDGE` is not set | Ollama `qwen2.5:7b` — used when `USE_LOCAL_JUDGE=1` in `.env` | Gemini free tier is 20 req/day; a long eval run (8 questions × 10 metrics) can exhaust this in one sitting | Local model is free and unlimited but scores ~10–20% lower on complex reasoning; treat results as directional, not comparable to Gemini results |
+| **JSON parse** | Direct `json.loads()` on the judge response | Regex extraction of `score` float from raw text | `de_answer_correctness` and `de_answer_completeness` ask the judge to return `{"score": ..., "reason": "..."}`. Small local models sometimes wrap the JSON in backticks or add prose | Regex fallback may miss the reason field; score is still captured, but `reason` defaults to `"(parse error)"` in the log |
+| **Fail-fast on error** | All 10 metrics evaluated per question | `_fatal_error` flag set; remaining questions skipped; process exits 1 | If a judge call returns a rate-limit or authentication error, continuing wastes time and produces misleading zeros | Errors are written to `eval_errors.log` with full traceback; early exit prevents a dashboard full of silent failures |
 
 ---
 
@@ -147,25 +167,62 @@ Read the files in this order. Each one is heavily commented with the "why".
 
 ### Step 7 — Evaluation (your home turf)
 
+#### Foundations
+
 | Concept | File | What you learn |
 |---|---|---|
 | **Golden dataset** | `eval/golden_qa.json` | The reference set you test against — including out-of-corpus traps |
-| **Retrieval hit rate** | `src/eval_custom.py` | Isolate retrieval from generation before blaming the LLM |
-| **Reference-based metrics** | `src/eval_custom.py` | Keyword matching: cheap, deterministic, brittle |
-| **Abstention / hallucination test** | `src/eval_custom.py` | Out-of-corpus questions *must* get "I don't know" |
-| **LLM-as-judge (binary)** | `prompts/judge_faithfulness_v1.txt` + `src/eval_custom.py` | A model grades a model — powerful, but it can be confidently wrong |
-| **Pass rates vs single runs** | `src/eval_custom.py` | Set `REPEATS=3` and watch scores wobble — the core reason AI testing differs |
-| **Faithfulness** | `src/eval_ragas.py` / `src/eval_deepeval.py` | Formal grounding metric = your hallucination test, standardised |
-| **Answer relevancy** | `src/eval_ragas.py` / `src/eval_deepeval.py` | Does the answer address the question asked? |
-| **Context precision** | `src/eval_ragas.py` / `src/eval_deepeval.py` | Retriever *noise* — too much junk fetched |
-| **Context recall** | `src/eval_ragas.py` / `src/eval_deepeval.py` | Retriever *misses* — needed facts not fetched |
-| **Answer correctness** | `prompts/judge_correctness_v1.txt` + `src/eval_langsmith.py` | Is the answer factually right compared to the reference? (penalises wrong values) |
-| **Answer completeness** | `prompts/judge_completeness_v1.txt` + `src/eval_langsmith.py` | Does the answer cover everything in the reference? (penalises missing facts) |
+| **Pass rates vs single runs** | `src/eval_custom.py` | Set `REPEATS=3` and watch scores wobble — the core reason AI testing differs from traditional QA |
 | **Eval framework trade-offs** | `src/eval_deepeval.py` vs `src/eval_ragas.py` | Same metrics, different frameworks — compare pass rates to understand tool variance |
-| **Local vs cloud judge** | `eval_deepeval.py` (`USE_LOCAL_JUDGE=1`) | When Gemini quota runs out, Ollama judge shows quality vs cost trade-off |
+| **Local vs cloud judge** | `eval_deepeval.py` (`USE_LOCAL_JUDGE=1`) | When Gemini quota runs out, Ollama judge shows the quality-vs-cost trade-off |
+| **Tracing / observability** | any script + LangSmith | For agents, the trace is the only way to tell a lucky answer from a correct process |
+
+#### Retrieval quality metrics
+
+| Metric | File | What you learn |
+|---|---|---|
+| **Retrieval hit rate** | `src/eval_custom.py` | Did the retriever fetch the right chunk? Isolates retrieval from generation before blaming the LLM |
+| **Context precision** | `src/eval_ragas.py` / `src/eval_deepeval.py` | Retriever *noise* — how much of what was fetched is actually relevant? |
+| **Context recall** | `src/eval_ragas.py` / `src/eval_deepeval.py` | Retriever *misses* — were all needed facts fetched? |
+| **Contextual relevancy** | `src/eval_deepeval.py` | Overlap of retrieved context with the question — a tighter version of precision |
+
+#### Generation quality metrics
+
+| Metric | File | What you learn |
+|---|---|---|
+| **Faithfulness** | `src/eval_ragas.py` / `src/eval_deepeval.py` | Is every claim in the answer grounded in the retrieved context? Formal hallucination test |
+| **Answer relevancy** | `src/eval_ragas.py` / `src/eval_deepeval.py` | Does the answer address the question that was actually asked? |
+| **LLM-as-judge (binary)** | `prompts/judge_faithfulness_v1.txt` + `src/eval_custom.py` | A model grades a model — powerful, but it can be confidently wrong. Understand the pitfalls before trusting the score |
+
+#### Reference-based metrics
+
+| Metric | File | What you learn |
+|---|---|---|
+| **Keyword correctness** | `src/eval_custom.py` | Deterministic, cheap, brittle — punishes correct answers that use different words. Exactly why the field moved to LLM-as-judge |
+| **Answer correctness** | `prompts/judge_correctness_v1.txt` + `src/eval_langsmith.py` | Is the answer factually right compared to the reference? Penalises wrong values |
+| **Answer completeness** | `prompts/judge_completeness_v1.txt` + `src/eval_langsmith.py` | Does the answer cover everything in the reference? Penalises missing facts, not extra correct detail |
+
+#### Safety / quality metrics
+
+| Metric | File | What you learn |
+|---|---|---|
+| **Hallucination** (DeepEval) | `src/eval_deepeval.py` / `src/eval_langsmith.py` | Scores the fraction of the answer that cannot be traced to the context (complementary to faithfulness) |
+| **Bias** | `src/eval_deepeval.py` / `src/eval_langsmith.py` | Does the answer reflect unfair assumptions or one-sided framing? |
+| **Toxicity** | `src/eval_deepeval.py` / `src/eval_langsmith.py` | Does the answer contain harmful, offensive, or inappropriate content? |
+
+#### Abstention / out-of-corpus metrics
+
+| Metric | File | What you learn |
+|---|---|---|
+| **Abstention test** | `src/eval_custom.py` | For questions not in the corpus, "correct" = "I don't know". This is your primary hallucination trap |
+| **Abstention (LangSmith)** | `src/eval_langsmith.py` | Same check, tracked per-experiment in LangSmith so you can compare abstention rate across pipeline versions |
+
+#### Experiment tracking
+
+| Concept | File | What you learn |
+|---|---|---|
 | **LangSmith experiments** | `src/eval_langsmith.py` | Creates the golden dataset in LangSmith programmatically and runs a named experiment — each run is stored so you can compare scores across code changes |
 | **LangSmith online evaluator** | `src/run_golden_eval.py` | Runs all 8 golden questions as a LangSmith experiment with no local judge — LangSmith's configured Answer Relevancy evaluator scores the traces automatically |
-| **Tracing / observability** | any script + LangSmith | For agents, the trace is the only way to tell a lucky answer from a correct process |
 
 ---
 

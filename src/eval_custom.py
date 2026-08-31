@@ -29,9 +29,10 @@ import json
 import os
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_ollama import ChatOllama
-from rag_chain import answer_with_context, JUDGE_MODEL, LOCAL_JUDGE_MODEL, _load_prompt
-
-REPEATS = 1   # bump to 3 to see run-to-run variance (recommended once it works)
+from rag_chain import (
+    answer_with_context, JUDGE_MODEL, LOCAL_JUDGE_MODEL,
+    REPEATS, PROMPT_JUDGE_FAITHFULNESS, _load_prompt,
+)
 
 
 def load_golden():
@@ -81,7 +82,7 @@ def abstained(answer) -> bool:
 # Mitigation: temperature 0, a tight rubric, and forcing a one-word verdict.
 # Never treat the judge as ground truth — validate it against your golden set.
 # ---------------------------------------------------------------------------
-JUDGE_PROMPT = _load_prompt("judge_faithfulness_v1.txt")
+JUDGE_PROMPT = _load_prompt(PROMPT_JUDGE_FAITHFULNESS)
 
 # USE_LOCAL_JUDGE=1 in .env uses Ollama (free, no quota) instead of Gemini.
 if os.getenv("USE_LOCAL_JUDGE") == "1":
