@@ -119,7 +119,7 @@ from config import (
     PROMPT_JUDGE_CORRECTNESS, PROMPT_JUDGE_COMPLETENESS,
     _load_prompt,
 )
-from judge import make_judge, abstained as _abstained
+from judgeUtil import make_judge, abstained as _abstained
 from rag_chain import answer_with_context
 
 DATASET_NAME = "zephyr-golden-qa"

@@ -38,7 +38,7 @@ from config import (
     FAITHFULNESS_THRESHOLD, RELEVANCY_THRESHOLD,
     CONTEXTUAL_RECALL_THRESHOLD, CONTEXTUAL_PRECISION_THRESHOLD,
 )
-from judge import GeminiJudge, make_judge, abstained  # noqa: F401 (GeminiJudge re-exported for clarity)
+from judgeUtil import GeminiJudge, make_judge, abstained  # noqa: F401 (GeminiJudge re-exported for clarity)
 from rag_chain import answer_with_context
 
 

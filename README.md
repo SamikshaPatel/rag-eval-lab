@@ -31,7 +31,7 @@ rag-eval-lab/
 │
 ├── src/
 │   ├── config.py                # ALL tunable parameters (single source of truth)
-│   ├── judge.py                 # Shared judge utilities: GeminiJudge, make_judge(), abstained()
+│   ├── judgeUtil.py             # Shared judge utilities: GeminiJudge, make_judge(), abstained()
 │   ├── ingest.py                # Chunk + embed + persist to chroma_db/
 │   ├── rag_chain.py             # RAG pipeline (imports constants from config.py)
 │   ├── agent.py                 # LangGraph ReAct agent (search + calculator tools)

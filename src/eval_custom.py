@@ -30,7 +30,7 @@ import os
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_ollama import ChatOllama
 from config import JUDGE_MODEL, LOCAL_JUDGE_MODEL, REPEATS, PROMPT_JUDGE_FAITHFULNESS, _load_prompt
-from judge import ABSTENTION_MARKERS
+from judgeUtil import ABSTENTION_MARKERS
 from rag_chain import answer_with_context
 
 
