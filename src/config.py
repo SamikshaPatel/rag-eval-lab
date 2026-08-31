@@ -15,7 +15,13 @@ No other .py file needs to change.
 from pathlib import Path
 
 # --- Storage -----------------------------------------------------------------
-DB_PATH = "./chroma_db"
+DB_PATH = "./chroma_db"                        # Zephyr corpus vector store
+
+# --- Northstar corpus --------------------------------------------------------
+NORTHSTAR_DB_PATH     = "./chroma_db_northstar"
+NORTHSTAR_DATA_PATH   = "data/Northstar_Digital_Bank.docx"
+NORTHSTAR_GOLDEN_PATH = "eval/golden_qa_northstar.jsonl"
+NORTHSTAR_DATASET_NAME = "northstar-golden-qa"
 
 # --- Models ------------------------------------------------------------------
 EMBED_MODEL       = "nomic-embed-text"   # local Ollama embedding model
