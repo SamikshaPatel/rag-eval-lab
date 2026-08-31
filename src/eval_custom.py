@@ -29,7 +29,7 @@ import json
 import os
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_ollama import ChatOllama
-from rag_chain import answer_with_context, JUDGE_MODEL, LOCAL_JUDGE_MODEL
+from rag_chain import answer_with_context, JUDGE_MODEL, LOCAL_JUDGE_MODEL, _load_prompt
 
 REPEATS = 1   # bump to 3 to see run-to-run variance (recommended once it works)
 
@@ -81,17 +81,7 @@ def abstained(answer) -> bool:
 # Mitigation: temperature 0, a tight rubric, and forcing a one-word verdict.
 # Never treat the judge as ground truth — validate it against your golden set.
 # ---------------------------------------------------------------------------
-JUDGE_PROMPT = """You are grading whether an ANSWER is fully supported by the CONTEXT.
-Reply with exactly one word: PASS if every claim in the answer is supported by
-the context, or FAIL if any claim is not supported.
-
-CONTEXT:
-{context}
-
-ANSWER:
-{answer}
-
-Verdict (PASS or FAIL):"""
+JUDGE_PROMPT = _load_prompt("judge_faithfulness_v1.txt")
 
 # USE_LOCAL_JUDGE=1 in .env uses Ollama (free, no quota) instead of Gemini.
 if os.getenv("USE_LOCAL_JUDGE") == "1":

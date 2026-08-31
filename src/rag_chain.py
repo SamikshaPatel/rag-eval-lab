@@ -18,8 +18,19 @@ Run directly to try a question:  python src/rag_chain.py "How much is Pro?"
 """
 
 import sys
+from pathlib import Path
 from dotenv import load_dotenv
 load_dotenv()
+
+
+def _load_prompt(filename: str) -> str:
+    """Load a prompt from the prompts/ directory. Strips the header comment
+    block (everything up to and including the first '---' separator line)."""
+    path = Path(__file__).parent.parent / "prompts" / filename
+    content = path.read_text()
+    if "---\n" in content:
+        return content.split("---\n", 1)[1]
+    return content
 
 from langchain_ollama import OllamaEmbeddings, ChatOllama
 from langchain_chroma import Chroma
@@ -36,6 +47,8 @@ JUDGE_MODEL = "gemini-3.6-flash"  # Gemini judge (20 req/day free tier)
 LOCAL_JUDGE_MODEL = "qwen2.5:7b"
 CHUNK_SIZE = 400      # characters per chunk — change here; ingest.py + eval pick it up automatically
 CHUNK_OVERLAP = 80    # overlap between chunks
+CORRECTNESS_THRESHOLD = 0.7   # Answer Correctness: min score to pass (factual accuracy vs reference)
+COMPLETENESS_THRESHOLD = 0.7  # Answer Completeness: min score to pass (coverage of reference facts)
 # ---------------------------------------------------------------------------
 # 1. RETRIEVER
 # What you learn: k is how many chunks you fetch. Another tuning knob and
@@ -59,19 +72,7 @@ def format_docs(docs) -> str:
 # the abstention tests in the golden set pass or fail. Editing this one string
 # changes your faithfulness scores — a direct, testable cause and effect.
 # ---------------------------------------------------------------------------
-PROMPT = ChatPromptTemplate.from_template(
-    """You are a support assistant for Zephyr Analytics.
-Answer the question using ONLY the context below.
-If the answer is not in the context, say exactly: "I don't know based on the handbook."
-Do not use any outside knowledge.
-
-Context:
-{context}
-
-Question: {question}
-
-Answer:"""
-)
+PROMPT = ChatPromptTemplate.from_template(_load_prompt("rag_grounding_v1.txt"))
 
 
 # ---------------------------------------------------------------------------

@@ -1,0 +1,19 @@
+# prompt: judge_faithfulness
+# version: 1.0
+# used_by: src/eval_custom.py → JUDGE_PROMPT → llm_judge()
+# variables: {context}, {answer}
+# purpose: Binary PASS/FAIL judge — checks if every claim in the answer
+#          is supported by the retrieved context. Tight rubric + one-word
+#          response minimises judge drift across runs.
+---
+You are grading whether an ANSWER is fully supported by the CONTEXT.
+Reply with exactly one word: PASS if every claim in the answer is supported by
+the context, or FAIL if any claim is not supported.
+
+CONTEXT:
+{context}
+
+ANSWER:
+{answer}
+
+Verdict (PASS or FAIL):

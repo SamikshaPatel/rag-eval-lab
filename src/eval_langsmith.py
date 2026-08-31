@@ -58,6 +58,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from rag_chain import (
     answer_with_context, JUDGE_MODEL, LOCAL_JUDGE_MODEL,
     CHAT_MODEL, EMBED_MODEL, CHUNK_SIZE, CHUNK_OVERLAP,
+    CORRECTNESS_THRESHOLD, COMPLETENESS_THRESHOLD, _load_prompt,
 )
 
 DATASET_NAME = "zephyr-golden-qa"
@@ -81,6 +82,7 @@ CONTEXTUAL_RELEVANCY_THRESHOLD = 0.7
 HALLUCINATION_THRESHOLD = 0.8  # 1=no hallucination, so higher threshold = stricter
 BIAS_THRESHOLD = 0.8           # 1=no bias, so higher threshold = stricter
 TOXICITY_THRESHOLD = 0.8       # 1=no toxicity, so higher threshold = stricter
+# CORRECTNESS_THRESHOLD and COMPLETENESS_THRESHOLD are imported from rag_chain — single source of truth
 
 ABSTENTION_MARKERS = [
     "don't know", "do not know", "not in", "no information",
@@ -249,6 +251,71 @@ def make_toxicity_evaluator(judge):
     return toxicity_evaluator
 
 
+def _judge_with_json_fallback(judge, prompt: str) -> float:
+    """
+    Call the judge with a prompt that asks for {"score": float, "reason": str}.
+    Falls back to asking for a bare float if JSON parsing fails (robustness for
+    weaker local models that may not follow JSON instructions reliably).
+    Returns a score in [0.0, 1.0], or 0.0 on total failure.
+    """
+    import json as _json
+    import re as _re
+
+    result = judge.generate(prompt)
+    # OllamaModel returns (text, cost) tuple; GeminiJudge returns plain str
+    raw = (result[0] if isinstance(result, tuple) else result).strip()
+
+    # Try parsing JSON block (model may wrap in ```json ... ```)
+    json_match = _re.search(r'\{.*?"score"\s*:\s*([0-9.]+).*?\}', raw, _re.DOTALL)
+    if json_match:
+        try:
+            score = float(json_match.group(1))
+            return max(0.0, min(1.0, score))
+        except ValueError:
+            pass
+
+    # Fallback: extract first float in response
+    num_match = _re.search(r'\b([01](?:\.\d+)?)\b', raw)
+    if num_match:
+        return max(0.0, min(1.0, float(num_match.group(1))))
+
+    return 0.0
+
+
+_CORRECTNESS_PROMPT = _load_prompt("judge_correctness_v1.txt")
+_COMPLETENESS_PROMPT = _load_prompt("judge_completeness_v1.txt")
+
+
+def make_correctness_evaluator(judge):
+    def correctness_evaluator(run, example) -> dict:
+        if not example.inputs.get("in_corpus", True):
+            return {"key": "de_answer_correctness", "score": None, "comment": "skipped — out-of-corpus"}
+        prompt = _CORRECTNESS_PROMPT.format(
+            question=example.inputs["question"],
+            reference=example.outputs["reference"],
+            actual=run.outputs["answer"],
+        )
+        score = _judge_with_json_fallback(judge, prompt)
+        passed = score >= CORRECTNESS_THRESHOLD
+        return {"key": "de_answer_correctness", "score": score, "comment": f"pass={passed}"}
+    return correctness_evaluator
+
+
+def make_completeness_evaluator(judge):
+    def completeness_evaluator(run, example) -> dict:
+        if not example.inputs.get("in_corpus", True):
+            return {"key": "de_answer_completeness", "score": None, "comment": "skipped — out-of-corpus"}
+        prompt = _COMPLETENESS_PROMPT.format(
+            question=example.inputs["question"],
+            reference=example.outputs["reference"],
+            actual=run.outputs["answer"],
+        )
+        score = _judge_with_json_fallback(judge, prompt)
+        passed = score >= COMPLETENESS_THRESHOLD
+        return {"key": "de_answer_completeness", "score": score, "comment": f"pass={passed}"}
+    return completeness_evaluator
+
+
 def de_abstention_evaluator(run, example) -> dict:
     if example.inputs.get("in_corpus", True):
         return {"key": "de_abstention", "score": None, "comment": "skipped — in-corpus"}
@@ -298,6 +365,8 @@ def main():
         "hallucination_threshold": HALLUCINATION_THRESHOLD,
         "bias_threshold": BIAS_THRESHOLD,
         "toxicity_threshold": TOXICITY_THRESHOLD,
+        "correctness_threshold": CORRECTNESS_THRESHOLD,
+        "completeness_threshold": COMPLETENESS_THRESHOLD,
     }
 
     print(f"\nRunning LangSmith experiment: {experiment_prefix!r}")
@@ -314,6 +383,8 @@ def main():
             make_hallucination_evaluator(judge),
             make_bias_evaluator(judge),
             make_toxicity_evaluator(judge),
+            make_correctness_evaluator(judge),
+            make_completeness_evaluator(judge),
             de_abstention_evaluator,
         ],
         experiment_prefix=experiment_prefix,
@@ -346,6 +417,7 @@ def main():
             print(f"  | {q}")
             print(f"    retrieval : precision={fmt('de_contextual_precision')}  recall={fmt('de_contextual_recall')}  relevancy={fmt('de_contextual_relevancy')}")
             print(f"    generation: faithfulness={fmt('de_faithfulness')}  answer_relevancy={fmt('de_answer_relevancy')}  hallucination={fmt('de_hallucination')}")
+            print(f"    reference : correctness={fmt('de_answer_correctness')}  completeness={fmt('de_answer_completeness')}")
             print(f"    safety    : bias={fmt('de_bias')}  toxicity={fmt('de_toxicity')}")
         except Exception as e:
             print(f"  (print error: {e})")
