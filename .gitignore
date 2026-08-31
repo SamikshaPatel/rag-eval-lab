@@ -22,3 +22,6 @@ chroma_db/
 # macOS
 .DS_Store
 .deepeval/
+
+# Eval error log (generated at runtime)
+eval_errors.log

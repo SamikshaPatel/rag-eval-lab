@@ -29,10 +29,47 @@ Run:
 """
 
 import json
+import logging
 import os
 import sys
+import threading
 from dotenv import load_dotenv
 load_dotenv()
+
+# ---------------------------------------------------------------------------
+# Structured error logger — writes to eval_errors.log separate from stdout.
+# Each entry includes a timestamp, the metric key, the question, and the
+# exception so failures are auditable without digging through mixed stdout.
+# ---------------------------------------------------------------------------
+_error_log = logging.getLogger("eval_errors")
+_error_log.setLevel(logging.ERROR)
+_error_log.propagate = False          # don't echo to root logger / stdout
+_fh = logging.FileHandler("eval_errors.log")
+_fh.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
+_error_log.addHandler(_fh)
+
+# Fail-fast flag: set to the first fatal exception; all subsequent evaluators
+# check this and raise immediately instead of calling the judge again.
+_fatal_error: Exception | None = None
+_fatal_lock = threading.Lock()
+
+
+def _check_fatal():
+    """Raise if a fatal model error was already recorded — enables early exit."""
+    if _fatal_error is not None:
+        raise _fatal_error
+
+
+def _record_fatal(exc: Exception, metric_key: str, question: str) -> None:
+    """Set the fail-fast flag (once) and write a structured error log entry."""
+    global _fatal_error
+    with _fatal_lock:
+        if _fatal_error is None:
+            _fatal_error = exc
+    _error_log.error(
+        "metric=%s question=%r error=%s: %s",
+        metric_key, question, type(exc).__name__, exc,
+    )
 
 from langsmith import Client
 from langsmith.evaluation import evaluate as ls_evaluate
@@ -51,7 +88,27 @@ from deepeval.metrics import (
 from deepeval.models import OllamaModel
 
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_google_genai.chat_models import GoogleRateLimitError
+from google.genai.errors import ClientError
 from deepeval.models import DeepEvalBaseLLM
+
+# Model errors that should abort the entire experiment immediately.
+_FATAL_EXCEPTIONS = (GoogleRateLimitError, ClientError)
+
+
+def _safe_evaluate(key: str, question: str, fn):
+    """
+    Run fn() — a callable that calls the judge and returns a score dict.
+    On rate-limit or API errors: log to eval_errors.log, set the fail-fast
+    flag, and re-raise so LangSmith surfaces the failure instead of silently
+    continuing with broken scores.
+    """
+    _check_fatal()
+    try:
+        return fn()
+    except _FATAL_EXCEPTIONS as exc:
+        _record_fatal(exc, key, question)
+        raise
 
 # Reuse constants and the traced answer function from rag_chain
 sys.path.insert(0, os.path.dirname(__file__))
@@ -179,9 +236,12 @@ def make_faithfulness_evaluator(judge):
     def faithfulness_evaluator(run, example) -> dict:
         if not example.inputs.get("in_corpus", True):
             return {"key": "de_faithfulness", "score": None, "comment": "skipped — out-of-corpus"}
-        metric = FaithfulnessMetric(threshold=FAITHFULNESS_THRESHOLD, model=judge, verbose_mode=False)
-        metric.measure(_build_case(run, example))
-        return {"key": "de_faithfulness", "score": metric.score}
+        q = example.inputs.get("question", "?")
+        def _run():
+            metric = FaithfulnessMetric(threshold=FAITHFULNESS_THRESHOLD, model=judge, verbose_mode=False)
+            metric.measure(_build_case(run, example))
+            return {"key": "de_faithfulness", "score": metric.score}
+        return _safe_evaluate("de_faithfulness", q, _run)
     return faithfulness_evaluator
 
 
@@ -189,9 +249,12 @@ def make_relevancy_evaluator(judge):
     def relevancy_evaluator(run, example) -> dict:
         if not example.inputs.get("in_corpus", True):
             return {"key": "de_answer_relevancy", "score": None, "comment": "skipped — out-of-corpus"}
-        metric = AnswerRelevancyMetric(threshold=RELEVANCY_THRESHOLD, model=judge, verbose_mode=False)
-        metric.measure(_build_case(run, example))
-        return {"key": "de_answer_relevancy", "score": metric.score}
+        q = example.inputs.get("question", "?")
+        def _run():
+            metric = AnswerRelevancyMetric(threshold=RELEVANCY_THRESHOLD, model=judge, verbose_mode=False)
+            metric.measure(_build_case(run, example))
+            return {"key": "de_answer_relevancy", "score": metric.score}
+        return _safe_evaluate("de_answer_relevancy", q, _run)
     return relevancy_evaluator
 
 
@@ -199,9 +262,12 @@ def make_contextual_precision_evaluator(judge):
     def contextual_precision_evaluator(run, example) -> dict:
         if not example.inputs.get("in_corpus", True):
             return {"key": "de_contextual_precision", "score": None, "comment": "skipped — out-of-corpus"}
-        metric = ContextualPrecisionMetric(threshold=CONTEXTUAL_PRECISION_THRESHOLD, model=judge, verbose_mode=False)
-        metric.measure(_build_case(run, example))
-        return {"key": "de_contextual_precision", "score": metric.score}
+        q = example.inputs.get("question", "?")
+        def _run():
+            metric = ContextualPrecisionMetric(threshold=CONTEXTUAL_PRECISION_THRESHOLD, model=judge, verbose_mode=False)
+            metric.measure(_build_case(run, example))
+            return {"key": "de_contextual_precision", "score": metric.score}
+        return _safe_evaluate("de_contextual_precision", q, _run)
     return contextual_precision_evaluator
 
 
@@ -209,9 +275,12 @@ def make_contextual_recall_evaluator(judge):
     def contextual_recall_evaluator(run, example) -> dict:
         if not example.inputs.get("in_corpus", True):
             return {"key": "de_contextual_recall", "score": None, "comment": "skipped — out-of-corpus"}
-        metric = ContextualRecallMetric(threshold=CONTEXTUAL_RECALL_THRESHOLD, model=judge, verbose_mode=False)
-        metric.measure(_build_case(run, example))
-        return {"key": "de_contextual_recall", "score": metric.score}
+        q = example.inputs.get("question", "?")
+        def _run():
+            metric = ContextualRecallMetric(threshold=CONTEXTUAL_RECALL_THRESHOLD, model=judge, verbose_mode=False)
+            metric.measure(_build_case(run, example))
+            return {"key": "de_contextual_recall", "score": metric.score}
+        return _safe_evaluate("de_contextual_recall", q, _run)
     return contextual_recall_evaluator
 
 
@@ -219,9 +288,12 @@ def make_contextual_relevancy_evaluator(judge):
     def contextual_relevancy_evaluator(run, example) -> dict:
         if not example.inputs.get("in_corpus", True):
             return {"key": "de_contextual_relevancy", "score": None, "comment": "skipped — out-of-corpus"}
-        metric = ContextualRelevancyMetric(threshold=CONTEXTUAL_RELEVANCY_THRESHOLD, model=judge, verbose_mode=False)
-        metric.measure(_build_case(run, example))
-        return {"key": "de_contextual_relevancy", "score": metric.score}
+        q = example.inputs.get("question", "?")
+        def _run():
+            metric = ContextualRelevancyMetric(threshold=CONTEXTUAL_RELEVANCY_THRESHOLD, model=judge, verbose_mode=False)
+            metric.measure(_build_case(run, example))
+            return {"key": "de_contextual_relevancy", "score": metric.score}
+        return _safe_evaluate("de_contextual_relevancy", q, _run)
     return contextual_relevancy_evaluator
 
 
@@ -229,36 +301,45 @@ def make_hallucination_evaluator(judge):
     def hallucination_evaluator(run, example) -> dict:
         if not example.inputs.get("in_corpus", True):
             return {"key": "de_hallucination", "score": None, "comment": "skipped — out-of-corpus"}
-        metric = HallucinationMetric(threshold=HALLUCINATION_THRESHOLD, model=judge, verbose_mode=False)
-        metric.measure(_build_case(run, example))
-        return {"key": "de_hallucination", "score": metric.score}
+        q = example.inputs.get("question", "?")
+        def _run():
+            metric = HallucinationMetric(threshold=HALLUCINATION_THRESHOLD, model=judge, verbose_mode=False)
+            metric.measure(_build_case(run, example))
+            return {"key": "de_hallucination", "score": metric.score}
+        return _safe_evaluate("de_hallucination", q, _run)
     return hallucination_evaluator
 
 
 def make_bias_evaluator(judge):
     def bias_evaluator(run, example) -> dict:
-        metric = BiasMetric(threshold=BIAS_THRESHOLD, model=judge, verbose_mode=False)
-        metric.measure(_build_case(run, example))
-        return {"key": "de_bias", "score": metric.score}
+        q = example.inputs.get("question", "?")
+        def _run():
+            metric = BiasMetric(threshold=BIAS_THRESHOLD, model=judge, verbose_mode=False)
+            metric.measure(_build_case(run, example))
+            return {"key": "de_bias", "score": metric.score}
+        return _safe_evaluate("de_bias", q, _run)
     return bias_evaluator
 
 
 def make_toxicity_evaluator(judge):
     def toxicity_evaluator(run, example) -> dict:
-        metric = ToxicityMetric(threshold=TOXICITY_THRESHOLD, model=judge, verbose_mode=False)
-        metric.measure(_build_case(run, example))
-        return {"key": "de_toxicity", "score": metric.score}
+        q = example.inputs.get("question", "?")
+        def _run():
+            metric = ToxicityMetric(threshold=TOXICITY_THRESHOLD, model=judge, verbose_mode=False)
+            metric.measure(_build_case(run, example))
+            return {"key": "de_toxicity", "score": metric.score}
+        return _safe_evaluate("de_toxicity", q, _run)
     return toxicity_evaluator
 
 
 def _judge_with_json_fallback(judge, prompt: str) -> float:
     """
     Call the judge with a prompt that asks for {"score": float, "reason": str}.
-    Falls back to asking for a bare float if JSON parsing fails (robustness for
-    weaker local models that may not follow JSON instructions reliably).
-    Returns a score in [0.0, 1.0], or 0.0 on total failure.
+    Falls back to extracting a bare float if JSON parsing fails (robustness for
+    weaker local models). Re-raises rate-limit / API errors immediately so the
+    fail-fast flag is set by the calling evaluator via _safe_evaluate.
+    Returns a score in [0.0, 1.0], or 0.0 on total parse failure.
     """
-    import json as _json
     import re as _re
 
     result = judge.generate(prompt)
@@ -290,14 +371,17 @@ def make_correctness_evaluator(judge):
     def correctness_evaluator(run, example) -> dict:
         if not example.inputs.get("in_corpus", True):
             return {"key": "de_answer_correctness", "score": None, "comment": "skipped — out-of-corpus"}
-        prompt = _CORRECTNESS_PROMPT.format(
-            question=example.inputs["question"],
-            reference=example.outputs["reference"],
-            actual=run.outputs["answer"],
-        )
-        score = _judge_with_json_fallback(judge, prompt)
-        passed = score >= CORRECTNESS_THRESHOLD
-        return {"key": "de_answer_correctness", "score": score, "comment": f"pass={passed}"}
+        q = example.inputs["question"]
+        def _run():
+            prompt = _CORRECTNESS_PROMPT.format(
+                question=q,
+                reference=example.outputs["reference"],
+                actual=run.outputs["answer"],
+            )
+            score = _judge_with_json_fallback(judge, prompt)
+            passed = score >= CORRECTNESS_THRESHOLD
+            return {"key": "de_answer_correctness", "score": score, "comment": f"pass={passed}"}
+        return _safe_evaluate("de_answer_correctness", q, _run)
     return correctness_evaluator
 
 
@@ -305,14 +389,17 @@ def make_completeness_evaluator(judge):
     def completeness_evaluator(run, example) -> dict:
         if not example.inputs.get("in_corpus", True):
             return {"key": "de_answer_completeness", "score": None, "comment": "skipped — out-of-corpus"}
-        prompt = _COMPLETENESS_PROMPT.format(
-            question=example.inputs["question"],
-            reference=example.outputs["reference"],
-            actual=run.outputs["answer"],
-        )
-        score = _judge_with_json_fallback(judge, prompt)
-        passed = score >= COMPLETENESS_THRESHOLD
-        return {"key": "de_answer_completeness", "score": score, "comment": f"pass={passed}"}
+        q = example.inputs["question"]
+        def _run():
+            prompt = _COMPLETENESS_PROMPT.format(
+                question=q,
+                reference=example.outputs["reference"],
+                actual=run.outputs["answer"],
+            )
+            score = _judge_with_json_fallback(judge, prompt)
+            passed = score >= COMPLETENESS_THRESHOLD
+            return {"key": "de_answer_completeness", "score": score, "comment": f"pass={passed}"}
+        return _safe_evaluate("de_answer_completeness", q, _run)
     return completeness_evaluator
 
 
