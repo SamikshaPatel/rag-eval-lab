@@ -30,6 +30,7 @@ import os
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_ollama import ChatOllama
 from config import JUDGE_MODEL, LOCAL_JUDGE_MODEL, REPEATS, PROMPT_JUDGE_FAITHFULNESS, _load_prompt
+from judge import ABSTENTION_MARKERS
 from rag_chain import answer_with_context
 
 
@@ -65,9 +66,7 @@ def keyword_correct(item, answer) -> bool:
 # For questions NOT in the corpus, "correct" means refusing to answer.
 # ---------------------------------------------------------------------------
 def abstained(answer) -> bool:
-    markers = ["don't know", "do not know", "not in", "no information",
-               "cannot", "can't", "not contain", "not available"]
-    return any(m in answer.lower() for m in markers)
+    return any(m in answer.lower() for m in ABSTENTION_MARKERS)
 
 
 # ---------------------------------------------------------------------------

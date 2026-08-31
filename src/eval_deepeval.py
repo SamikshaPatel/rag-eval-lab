@@ -32,65 +32,14 @@ from deepeval.metrics import (
     ContextualRecallMetric,
     ContextualPrecisionMetric,
 )
-from deepeval.models import DeepEvalBaseLLM, OllamaModel
 from deepeval.evaluate.configs import AsyncConfig, DisplayConfig
-from langchain_google_genai import ChatGoogleGenerativeAI
 
 from config import (
-    JUDGE_MODEL, LOCAL_JUDGE_MODEL,
     FAITHFULNESS_THRESHOLD, RELEVANCY_THRESHOLD,
     CONTEXTUAL_RECALL_THRESHOLD, CONTEXTUAL_PRECISION_THRESHOLD,
 )
+from judge import GeminiJudge, make_judge, abstained  # noqa: F401 (GeminiJudge re-exported for clarity)
 from rag_chain import answer_with_context
-
-
-# ---------------------------------------------------------------------------
-# DeepEval requires models to subclass DeepEvalBaseLLM.
-# For Gemini we wrap ChatGoogleGenerativeAI; for Ollama we use the built-in
-# OllamaModel. Set USE_LOCAL_JUDGE=1 in .env to use Ollama (free, no quota).
-# ---------------------------------------------------------------------------
-class GeminiJudge(DeepEvalBaseLLM):
-    def __init__(self):
-        self._llm = ChatGoogleGenerativeAI(model=JUDGE_MODEL, temperature=0)
-
-    def load_model(self):
-        return self._llm
-
-    def get_model_name(self) -> str:
-        return JUDGE_MODEL
-
-    def generate(self, prompt: str) -> str:
-        result = self._llm.invoke(prompt).content
-        if isinstance(result, list):
-            result = " ".join(
-                p.get("text", str(p)) if isinstance(p, dict) else str(p)
-                for p in result
-            )
-        return result
-
-    async def a_generate(self, prompt: str) -> str:
-        return self.generate(prompt)
-
-
-def make_judge():
-    if os.getenv("USE_LOCAL_JUDGE") == "1":
-        print(f"[judge] Using local Ollama model: {LOCAL_JUDGE_MODEL}")
-        return OllamaModel(model=LOCAL_JUDGE_MODEL, temperature=0)
-    print(f"[judge] Using Gemini: {JUDGE_MODEL}")
-    return GeminiJudge()
-
-
-# ---------------------------------------------------------------------------
-# Abstention check (mirrors eval_custom.py)
-# ---------------------------------------------------------------------------
-ABSTENTION_MARKERS = [
-    "don't know", "do not know", "not in", "no information",
-    "cannot", "can't", "not contain", "not available",
-]
-
-def abstained(answer: str) -> bool:
-    low = answer.lower()
-    return any(m in low for m in ABSTENTION_MARKERS)
 
 
 # ---------------------------------------------------------------------------

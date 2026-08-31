@@ -53,6 +53,8 @@ data/zephyr_handbook.md
 
 **`src/config.py`** — Single source of truth for all tunable parameters: model names, chunk size/overlap, retrieval k, temperature, prompt filenames, and all metric thresholds. Every other script imports constants from here. To change any knob, edit this file only.
 
+**`src/judge.py`** — Shared judge utilities: `GeminiJudge` (DeepEvalBaseLLM wrapper for Gemini), `make_judge()` (returns Gemini or Ollama judge based on `USE_LOCAL_JUDGE`), `ABSTENTION_MARKERS`, and `abstained()`. Used by `eval_custom.py`, `eval_deepeval.py`, and `eval_langsmith.py` — no duplication.
+
 **`src/ingest.py`** — One-time ingestion: loads `data/zephyr_handbook.md`, splits into 400-char chunks (80-char overlap), embeds with `nomic-embed-text`, persists to `./chroma_db/`. Chunk size is a primary tuning knob—change `CHUNK_SIZE`/`CHUNK_OVERLAP` in `config.py` (single source of truth), then re-run this script.
 
 **`src/rag_chain.py`** — Core RAG pipeline. Exposes `answer_with_context(question, k)` returning both answer and retrieved contexts (required for eval). `k=3` retrieved chunks by default; temperature=0 for repeatability. Grounding prompt instructs the model to say "I don't know based on the handbook" for out-of-corpus questions.

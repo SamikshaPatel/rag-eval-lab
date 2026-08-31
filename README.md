@@ -30,8 +30,10 @@ rag-eval-lab/
 │   └── judge_completeness_v1.txt  # Scored answer completeness judge
 │
 ├── src/
+│   ├── config.py                # ALL tunable parameters (single source of truth)
+│   ├── judge.py                 # Shared judge utilities: GeminiJudge, make_judge(), abstained()
 │   ├── ingest.py                # Chunk + embed + persist to chroma_db/
-│   ├── rag_chain.py             # RAG pipeline + shared constants
+│   ├── rag_chain.py             # RAG pipeline (imports constants from config.py)
 │   ├── agent.py                 # LangGraph ReAct agent (search + calculator tools)
 │   ├── eval_custom.py           # Hand-rolled eval harness (4 metrics)
 │   ├── eval_ragas.py            # RAGAS evaluation (faithfulness, relevancy, precision, recall)

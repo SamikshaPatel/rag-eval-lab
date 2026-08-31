@@ -85,12 +85,8 @@ from deepeval.metrics import (
     BiasMetric,
     ToxicityMetric,
 )
-from deepeval.models import OllamaModel
-
-from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_google_genai.chat_models import GoogleRateLimitError
 from google.genai.errors import ClientError
-from deepeval.models import DeepEvalBaseLLM
 
 # Model errors that should abort the entire experiment immediately.
 _FATAL_EXCEPTIONS = (GoogleRateLimitError, ClientError)
@@ -123,52 +119,11 @@ from config import (
     PROMPT_JUDGE_CORRECTNESS, PROMPT_JUDGE_COMPLETENESS,
     _load_prompt,
 )
+from judge import make_judge, abstained as _abstained
 from rag_chain import answer_with_context
 
 DATASET_NAME = "zephyr-golden-qa"
 GOLDEN_PATH  = "eval/golden_qa.json"
-
-# All pipeline parameters (models, thresholds, chunk settings, prompt filenames)
-# are imported from src/rag_chain.py — the single source of truth.
-
-ABSTENTION_MARKERS = [
-    "don't know", "do not know", "not in", "no information",
-    "cannot", "can't", "not contain", "not available",
-]
-
-
-# ---------------------------------------------------------------------------
-# Judge model (mirrors eval_deepeval.py)
-# ---------------------------------------------------------------------------
-class GeminiJudge(DeepEvalBaseLLM):
-    def __init__(self):
-        self._llm = ChatGoogleGenerativeAI(model=JUDGE_MODEL, temperature=0)
-
-    def load_model(self):
-        return self._llm
-
-    def get_model_name(self) -> str:
-        return JUDGE_MODEL
-
-    def generate(self, prompt: str) -> str:
-        result = self._llm.invoke(prompt).content
-        if isinstance(result, list):
-            result = " ".join(
-                p.get("text", str(p)) if isinstance(p, dict) else str(p)
-                for p in result
-            )
-        return result
-
-    async def a_generate(self, prompt: str) -> str:
-        return self.generate(prompt)
-
-
-def make_judge():
-    if os.getenv("USE_LOCAL_JUDGE") == "1":
-        print(f"[judge] Using local Ollama model: {LOCAL_JUDGE_MODEL}")
-        return OllamaModel(model=LOCAL_JUDGE_MODEL, temperature=0)
-    print(f"[judge] Using Gemini: {JUDGE_MODEL}")
-    return GeminiJudge()
 
 
 # ---------------------------------------------------------------------------
@@ -397,7 +352,7 @@ def de_abstention_evaluator(run, example) -> dict:
     if example.inputs.get("in_corpus", True):
         return {"key": "de_abstention", "score": None, "comment": "skipped — in-corpus"}
     answer = run.outputs["answer"].lower()
-    passed = any(m in answer for m in ABSTENTION_MARKERS)
+    passed = _abstained(answer)
     return {"key": "de_abstention", "score": 1.0 if passed else 0.0}
 
 
