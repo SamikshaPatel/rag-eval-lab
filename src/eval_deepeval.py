@@ -36,7 +36,12 @@ from deepeval.models import DeepEvalBaseLLM, OllamaModel
 from deepeval.evaluate.configs import AsyncConfig, DisplayConfig
 from langchain_google_genai import ChatGoogleGenerativeAI
 
-from rag_chain import answer_with_context, JUDGE_MODEL, LOCAL_JUDGE_MODEL
+from config import (
+    JUDGE_MODEL, LOCAL_JUDGE_MODEL,
+    FAITHFULNESS_THRESHOLD, RELEVANCY_THRESHOLD,
+    CONTEXTUAL_RECALL_THRESHOLD, CONTEXTUAL_PRECISION_THRESHOLD,
+)
+from rag_chain import answer_with_context
 
 
 # ---------------------------------------------------------------------------
@@ -98,10 +103,10 @@ def main():
     judge = make_judge()
 
     metrics = [
-        FaithfulnessMetric(threshold=0.7, model=judge, verbose_mode=False),
-        AnswerRelevancyMetric(threshold=0.7, model=judge, verbose_mode=False),
-        ContextualRecallMetric(threshold=0.7, model=judge, verbose_mode=False),
-        ContextualPrecisionMetric(threshold=0.7, model=judge, verbose_mode=False),
+        FaithfulnessMetric(threshold=FAITHFULNESS_THRESHOLD, model=judge, verbose_mode=False),
+        AnswerRelevancyMetric(threshold=RELEVANCY_THRESHOLD, model=judge, verbose_mode=False),
+        ContextualRecallMetric(threshold=CONTEXTUAL_RECALL_THRESHOLD, model=judge, verbose_mode=False),
+        ContextualPrecisionMetric(threshold=CONTEXTUAL_PRECISION_THRESHOLD, model=judge, verbose_mode=False),
     ]
 
     in_corpus_cases = []

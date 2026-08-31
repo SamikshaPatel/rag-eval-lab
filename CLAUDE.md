@@ -51,7 +51,9 @@ data/zephyr_handbook.md
 
 ### Key Components
 
-**`src/ingest.py`** — One-time ingestion: loads `data/zephyr_handbook.md`, splits into 400-char chunks (80-char overlap), embeds with `nomic-embed-text`, persists to `./chroma_db/`. Chunk size is a primary tuning knob—change `CHUNK_SIZE`/`CHUNK_OVERLAP` in `rag_chain.py` (single source of truth), then re-run this script.
+**`src/config.py`** — Single source of truth for all tunable parameters: model names, chunk size/overlap, retrieval k, temperature, prompt filenames, and all metric thresholds. Every other script imports constants from here. To change any knob, edit this file only.
+
+**`src/ingest.py`** — One-time ingestion: loads `data/zephyr_handbook.md`, splits into 400-char chunks (80-char overlap), embeds with `nomic-embed-text`, persists to `./chroma_db/`. Chunk size is a primary tuning knob—change `CHUNK_SIZE`/`CHUNK_OVERLAP` in `config.py` (single source of truth), then re-run this script.
 
 **`src/rag_chain.py`** — Core RAG pipeline. Exposes `answer_with_context(question, k)` returning both answer and retrieved contexts (required for eval). `k=3` retrieved chunks by default; temperature=0 for repeatability. Grounding prompt instructs the model to say "I don't know based on the handbook" for out-of-corpus questions.
 
@@ -76,5 +78,5 @@ data/zephyr_handbook.md
 - **Fictional corpus**: Forces retrieval dependency; model cannot rely on training data
 - **Temperature=0**: Reduces variance in generation for more reproducible evals
 - **`answer_with_context()`**: Returns contexts alongside answers—RAGAS and custom eval both need the retrieved chunks, not just the final answer
-- **Gemini 3.6 Flash as judge**: All three eval scripts (`eval_custom.py`, `eval_ragas.py`, `eval_deepeval.py`) use `JUDGE_MODEL = "gemini-3.6-flash"` (defined in `rag_chain.py`) via `ChatGoogleGenerativeAI`. Requires `GOOGLE_API_KEY` in `.env`. Free tier is 20 req/day — set `USE_LOCAL_JUDGE=1` in `.env` to fall back to `LOCAL_JUDGE_MODEL = "qwen2.5:7b"` via Ollama when quota is exhausted. Ollama is always used for RAG generation and embeddings; only the judge role uses Gemini.
+- **Gemini 3.6 Flash as judge**: All three eval scripts (`eval_custom.py`, `eval_ragas.py`, `eval_deepeval.py`) use `JUDGE_MODEL = "gemini-3.6-flash"` (defined in `config.py`) via `ChatGoogleGenerativeAI`. Requires `GOOGLE_API_KEY` in `.env`. Free tier is 20 req/day — set `USE_LOCAL_JUDGE=1` in `.env` to fall back to `LOCAL_JUDGE_MODEL = "qwen2.5:7b"` via Ollama when quota is exhausted. Ollama is always used for RAG generation and embeddings; only the judge role uses Gemini.
 - **Calculator whitelist**: `re.fullmatch(r'[\d\s\+\-\*/\(\)\.]+', expression)` prevents code injection via the tool

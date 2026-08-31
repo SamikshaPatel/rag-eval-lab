@@ -61,7 +61,7 @@ rag-eval-lab/
 
 ## Where pipeline parameters live
 
-**Single source of truth: `src/rag_chain.py`**
+**Single source of truth: `src/config.py`**
 
 Every tunable knob is defined here and imported by every other script. To run a different configuration, change **one file only** — nothing else needs editing.
 
@@ -98,7 +98,7 @@ Every tunable knob is defined here and imported by every other script. To run a 
 
 All prompts are in `prompts/`. Each file has a header comment block (stripped at load time) with version, purpose, and variable documentation, followed by a `---` separator and the prompt body.
 
-Prompts are loaded at import time via `_load_prompt(filename)` defined in `src/rag_chain.py`. The prompt **filenames** are also constants in `src/rag_chain.py` (e.g. `PROMPT_RAG_GROUNDING = "rag_grounding_v1.txt"`), so upgrading a prompt version means updating one constant — no `.py` logic changes needed.
+Prompts are loaded at import time via `_load_prompt(filename)` defined in `src/config.py`. The prompt **filenames** are also constants in `src/config.py` (e.g. `PROMPT_RAG_GROUNDING = "rag_grounding_v1.txt"`), so upgrading a prompt version means updating one constant — no `.py` logic changes needed.
 
 | Prompt file | Filename constant | Used by | Variable | Function |
 |---|---|---|---|---|
@@ -107,7 +107,7 @@ Prompts are loaded at import time via `_load_prompt(filename)` defined in `src/r
 | `judge_correctness_v1.txt` | `PROMPT_JUDGE_CORRECTNESS` | `src/eval_langsmith.py` | `_CORRECTNESS_PROMPT` | `make_correctness_evaluator()` — scores factual accuracy vs reference |
 | `judge_completeness_v1.txt` | `PROMPT_JUDGE_COMPLETENESS` | `src/eval_langsmith.py` | `_COMPLETENESS_PROMPT` | `make_completeness_evaluator()` — scores coverage of reference facts |
 
-**To version a prompt:** copy the file to `*_v2.txt`, edit the body and update the `# version:` header, then change the filename constant in `src/rag_chain.py` (e.g. `PROMPT_JUDGE_CORRECTNESS = "judge_correctness_v2.txt"`). Old versions remain on disk for reproducibility. No other `.py` file needs to change.
+**To version a prompt:** copy the file to `*_v2.txt`, edit the body and update the `# version:` header, then change the filename constant in `src/config.py` (e.g. `PROMPT_JUDGE_CORRECTNESS = "judge_correctness_v2.txt"`). Old versions remain on disk for reproducibility. No other `.py` file needs to change.
 
 ---
 

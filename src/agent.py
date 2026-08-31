@@ -30,7 +30,8 @@ from langchain_ollama import ChatOllama
 from langchain_core.tools import tool
 from langgraph.prebuilt import create_react_agent
 
-from rag_chain import get_retriever, CHAT_MODEL
+from config import CHAT_MODEL
+from rag_chain import get_retriever
 
 
 # ---------------------------------------------------------------------------

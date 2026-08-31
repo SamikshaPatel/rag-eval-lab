@@ -29,10 +29,8 @@ import json
 import os
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_ollama import ChatOllama
-from rag_chain import (
-    answer_with_context, JUDGE_MODEL, LOCAL_JUDGE_MODEL,
-    REPEATS, PROMPT_JUDGE_FAITHFULNESS, _load_prompt,
-)
+from config import JUDGE_MODEL, LOCAL_JUDGE_MODEL, REPEATS, PROMPT_JUDGE_FAITHFULNESS, _load_prompt
+from rag_chain import answer_with_context
 
 
 def load_golden():

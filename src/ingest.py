@@ -18,7 +18,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_ollama import OllamaEmbeddings
 from langchain_chroma import Chroma
 
-from rag_chain import DB_PATH, EMBED_MODEL, CHUNK_SIZE, CHUNK_OVERLAP
+from config import DB_PATH, EMBED_MODEL, CHUNK_SIZE, CHUNK_OVERLAP
 
 DATA_PATH = "data/zephyr_handbook.md"
 

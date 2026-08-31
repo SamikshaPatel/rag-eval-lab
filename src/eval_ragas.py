@@ -30,7 +30,8 @@ from langchain_ollama import OllamaEmbeddings
 import os
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_ollama import ChatOllama
-from rag_chain import answer_with_context, JUDGE_MODEL, LOCAL_JUDGE_MODEL, EMBED_MODEL
+from config import JUDGE_MODEL, LOCAL_JUDGE_MODEL, EMBED_MODEL
+from rag_chain import answer_with_context
 
 # RAGAS 0.2.x imports. If these fail, check `pip show ragas` — the API changed
 # across versions. Your hand-rolled eval_custom.py is the version-proof backup.

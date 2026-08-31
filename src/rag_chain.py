@@ -18,19 +18,8 @@ Run directly to try a question:  python src/rag_chain.py "How much is Pro?"
 """
 
 import sys
-from pathlib import Path
 from dotenv import load_dotenv
 load_dotenv()
-
-
-def _load_prompt(filename: str) -> str:
-    """Load a prompt from the prompts/ directory. Strips the header comment
-    block (everything up to and including the first '---' separator line)."""
-    path = Path(__file__).parent.parent / "prompts" / filename
-    content = path.read_text()
-    if "---\n" in content:
-        return content.split("---\n", 1)[1]
-    return content
 
 from langchain_ollama import OllamaEmbeddings, ChatOllama
 from langchain_chroma import Chroma
@@ -39,48 +28,20 @@ from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
 from langsmith import traceable
 
-# =============================================================================
-# ALL TUNABLE PARAMETERS — this is the single file to edit for any config change.
-# Every other script imports from here; nothing is hardcoded elsewhere.
-# =============================================================================
-
-# --- Models ------------------------------------------------------------------
-DB_PATH = "./chroma_db"
-EMBED_MODEL    = "nomic-embed-text"   # local Ollama embedding model
-CHAT_MODEL     = "llama3.1:8b"        # local Ollama generation model
-JUDGE_MODEL    = "gemini-3.6-flash"   # cloud judge (default; 20 req/day free)
-LOCAL_JUDGE_MODEL = "qwen2.5:7b"      # local fallback judge (USE_LOCAL_JUDGE=1)
-
-# --- Chunking ----------------------------------------------------------------
-CHUNK_SIZE    = 400   # chars per chunk — re-run ingest.py after changing
-CHUNK_OVERLAP = 80    # overlap between chunks
-
-# --- Retrieval & generation --------------------------------------------------
-RETRIEVAL_K = 3     # chunks fetched per query
-TEMPERATURE = 0.0   # generation temperature (0 = most deterministic)
-REPEATS     = 1     # eval_custom: bump to 3+ to measure run-to-run variance
-
-# --- Prompt filenames --------------------------------------------------------
-# To upgrade a prompt: copy prompts/X_v1.txt → prompts/X_v2.txt, edit the
-# body, update the version string below. No other .py file needs to change.
-PROMPT_RAG_GROUNDING      = "rag_grounding_v1.txt"
-PROMPT_JUDGE_FAITHFULNESS = "judge_faithfulness_v1.txt"
-PROMPT_JUDGE_CORRECTNESS  = "judge_correctness_v1.txt"
-PROMPT_JUDGE_COMPLETENESS = "judge_completeness_v1.txt"
-
-# --- Metric thresholds (pass/fail boundary; raw scores are always logged) ----
-FAITHFULNESS_THRESHOLD         = 0.7
-RELEVANCY_THRESHOLD            = 0.7
-CONTEXTUAL_PRECISION_THRESHOLD = 0.7
-CONTEXTUAL_RECALL_THRESHOLD    = 0.7
-CONTEXTUAL_RELEVANCY_THRESHOLD = 0.7
-HALLUCINATION_THRESHOLD        = 0.8   # 1=no hallucination → higher = stricter
-BIAS_THRESHOLD                 = 0.8   # 1=no bias          → higher = stricter
-TOXICITY_THRESHOLD             = 0.8   # 1=no toxicity      → higher = stricter
-CORRECTNESS_THRESHOLD          = 0.7
-COMPLETENESS_THRESHOLD         = 0.7
-
-# =============================================================================
+# All tunable parameters and _load_prompt live in config.py — the single
+# source of truth. Import everything from there; nothing is defined here.
+from config import (
+    DB_PATH, EMBED_MODEL, CHAT_MODEL, JUDGE_MODEL, LOCAL_JUDGE_MODEL,
+    CHUNK_SIZE, CHUNK_OVERLAP, RETRIEVAL_K, TEMPERATURE, REPEATS,
+    PROMPT_RAG_GROUNDING, PROMPT_JUDGE_FAITHFULNESS,
+    PROMPT_JUDGE_CORRECTNESS, PROMPT_JUDGE_COMPLETENESS,
+    FAITHFULNESS_THRESHOLD, RELEVANCY_THRESHOLD,
+    CONTEXTUAL_PRECISION_THRESHOLD, CONTEXTUAL_RECALL_THRESHOLD,
+    CONTEXTUAL_RELEVANCY_THRESHOLD, HALLUCINATION_THRESHOLD,
+    BIAS_THRESHOLD, TOXICITY_THRESHOLD,
+    CORRECTNESS_THRESHOLD, COMPLETENESS_THRESHOLD,
+    _load_prompt,
+)
 # ---------------------------------------------------------------------------
 # 1. RETRIEVER
 # What you learn: k is how many chunks you fetch. Another tuning knob and

@@ -110,10 +110,9 @@ def _safe_evaluate(key: str, question: str, fn):
         _record_fatal(exc, key, question)
         raise
 
-# Reuse constants and the traced answer function from rag_chain
 sys.path.insert(0, os.path.dirname(__file__))
-from rag_chain import (
-    answer_with_context, JUDGE_MODEL, LOCAL_JUDGE_MODEL,
+from config import (
+    JUDGE_MODEL, LOCAL_JUDGE_MODEL,
     CHAT_MODEL, EMBED_MODEL, CHUNK_SIZE, CHUNK_OVERLAP,
     RETRIEVAL_K, TEMPERATURE,
     FAITHFULNESS_THRESHOLD, RELEVANCY_THRESHOLD,
@@ -124,6 +123,7 @@ from rag_chain import (
     PROMPT_JUDGE_CORRECTNESS, PROMPT_JUDGE_COMPLETENESS,
     _load_prompt,
 )
+from rag_chain import answer_with_context
 
 DATASET_NAME = "zephyr-golden-qa"
 GOLDEN_PATH  = "eval/golden_qa.json"
