@@ -446,7 +446,7 @@ tools: search_handbook (RAG retriever), calculator (arithmetic)
 | AGT-004 | Which plans include the Pulse feature? | `[search_handbook]` | `[search_handbook]` | ✓ | ✓ | — | ✓ | ✅ PASS |
 | AGT-005 | What is 49 times 12? | `[calculator]` | `[calculator]` | ✓ | ✓ | — | ✓ | ✅ PASS |
 | AGT-006 | What is 90 divided by 30? | `[calculator]` | `[calculator]` | ✓ | ✓ | — | ✓ | ✅ PASS |
-| AGT-007 | 90 extra days retention — cost? | `[search, calc]` | `[search_handbook]` | ✗ | ✓ | ✗ | ✓ | ❌ FAIL |
+| AGT-007 | 90 extra days retention — cost? | `[search, calc]` | `[search_handbook]` ¹ | ✗ | ✓ | ✗ | ✓ | ❌ FAIL |
 | AGT-008 | Monthly cost for 5 Pro seats? | `[search, calc]` | `[search_handbook]` | ✗ | ✓ | ✗ | ✓ | ❌ FAIL |
 | AGT-009 | 60 extra days retention — cost? | `[search, calc]` | `[calculator]` | ✗ | ✓ | ✗ | ✗ | ❌ FAIL |
 | AGT-010 | 3 Pro seats for a full year — cost? | `[search, calc]` | `[calculator]` | ✗ | ✓ | ✗ | ✗ | ❌ FAIL |
@@ -468,7 +468,7 @@ tools: search_handbook (RAG retriever), calculator (arithmetic)
 | Question | Failure pattern | Root cause |
 |----------|----------------|------------|
 | AGT-002 | Tool routing correct, answer wrong | Retrieval gap — pricing chunk not surfaced (same issue as RAG eval) |
-| AGT-007, AGT-008 | Called `search_handbook` only; skipped `calculator` | Model did arithmetic inline in the generated text (`$15 x 3 = $45`) rather than calling the calculator tool — correct answer, unreliable path |
+| AGT-007, AGT-008 | Called `search_handbook` only; skipped `calculator` | Model did arithmetic inline in the generated text (`$15 x 3 = $45`) rather than calling the calculator tool — correct answer, unreliable path. ¹ See non-determinism note below. |
 | AGT-009 | Called `calculator` only; skipped `search_handbook` | Model guessed the add-on rate instead of retrieving it first; calculator had no valid input value, returned an error |
 | AGT-010 | Called `calculator` only; skipped `search_handbook` | Same as AGT-009 — model attempted to calculate without the retrieved price, produced `$108` (wrong) |
 
@@ -482,6 +482,35 @@ question on tool ordering. Two patterns emerged:
 
 Both patterns are invisible if you only check the final answer. The trace is the
 only way to distinguish a grounded answer from a lucky guess.
+
+**¹ Non-determinism finding — AGT-007:**
+
+The same question produced different tool paths across two runs at `temperature=0`:
+
+| Run | Tools actually called | How $45 was reached |
+|-----|-----------------------|---------------------|
+| `eval_agent.py` (automated) | `[search_handbook]` only | Retrieved price, computed `$15 × 3 = $45` inline in text |
+| `agent.py` manual (LangSmith trace) | `[calculator]` only | Hard-coded `90 / 30 * 15` — no retrieval |
+| **Correct path** | `[search_handbook → calculator]` | Retrieve `$15/30 days`, then call calculator with `90/30*15` |
+
+Both runs returned the correct answer `$45`, but via opposite wrong paths — one
+skipped the calculator, the other skipped retrieval. This demonstrates that even
+`temperature=0` does not guarantee deterministic tool routing in ReAct agents.
+
+**Implication:** A single-run agent eval that checks only the final answer would
+report AGT-007 as PASS in both runs. The trace reveals that neither run used the
+correct path. Production agent evals should run each question multiple times and
+compare tool-call distributions, not just final answers.
+
+**Screenshots:**
+
+`eval_agent.py` terminal output (all 12 questions, per-question pass/fail, summary metrics):
+
+![Agent eval terminal output](docs/screenshots/5_agent_eval_terminal_output.png)
+
+LangSmith trace for AGT-007 — manual run showing `[calculator]` only with hard-coded formula:
+
+![LangSmith multi-step trace](docs/screenshots/5_agent_langsmith_multistep_trace.png)
 
 ---
 

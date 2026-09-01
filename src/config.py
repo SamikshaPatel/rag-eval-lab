@@ -49,7 +49,7 @@ NORTHSTAR_RUN_NUMBER = 4
 # --- Retrieval & generation --------------------------------------------------
 RETRIEVAL_K = 3     # chunks kept after reranking (or fetched if no reranker)
 TEMPERATURE = 0.0   # generation temperature (0 = most deterministic)
-REPEATS     = 1     # eval_custom: bump to 3+ to measure run-to-run variance
+REPEATS     = 3     # eval_custom: bump to 3+ to measure run-to-run variance
 
 # --- Reranking ---------------------------------------------------------------
 # Cross-encoder reranker: fetch RERANKER_FETCH_K candidates, rerank, keep RETRIEVAL_K.
