@@ -16,6 +16,7 @@ Built with a fully local, free stack across two fictional corpora. The pipeline 
 | Single-query retrieval fails for comparison questions | NSB-033 (Viewer vs User) required per-entity queries to guarantee both role chunks appeared in top-k |
 | Evaluation framework choice affects the numbers you see | RAGAS context recall = 1.000 vs DeepEval = 0.510 on identical inputs — documented with root-cause analysis |
 | Hallucination is testable and measurable | Abstention rate on 8 out-of-corpus questions: 100% correct refusal across all runs |
+| A correct answer is not the same as a correct path | Agent eval: `llama3.1:8b` answers pure arithmetic with 90% accuracy but only 83% tool hit rate — it bypasses the calculator and answers from training knowledge, which fails when the value needs to come from a retrieved source |
 
 > **On scores:** Absolute metric values reflect the open-source models used (`llama3.1:8b` generation, `qwen2.5:7b` judge). The signal that matters is **relative change across runs** — the same discipline used to interpret pass-rate trends in traditional test suites. The methodology transfers to any model stack.
 
@@ -31,7 +32,8 @@ rag-eval-lab/
 │   └── Northstar_Digital_Bank.docx  # Northstar corpus (fictional banking handbook)
 │
 ├── eval/
-│   ├── golden_qa_zephyr.json        # 8 golden QA pairs for Zephyr (6 in-corpus, 2 abstention)
+│   ├── golden_qa_zephyr.json        # 8 golden QA pairs for Zephyr RAG eval (6 in-corpus, 2 abstention)
+│   ├── golden_qa_agent.json         # 12 golden QA pairs for agent eval (4 categories, 4 metrics)
 │   └── golden_qa_northstar.jsonl    # 44 golden QA pairs for Northstar (36 in-corpus, 8 ood)
 │
 ├── prompts/                     # All LLM prompt templates, versioned
@@ -51,6 +53,7 @@ rag-eval-lab/
 │   ├── eval_custom.py           # Hand-rolled eval harness (4 metrics)
 │   ├── eval_ragas.py            # RAGAS evaluation (faithfulness, relevancy, precision, recall)
 │   ├── eval_deepeval.py         # DeepEval evaluation (pytest-style, fewer LLM calls)
+│   ├── eval_agent.py            # Agent evaluation — tool routing, sequence, answer accuracy (4 metrics)
 │   ├── eval_langsmith.py        # LangSmith experiment runner — Zephyr (10 metrics)
 │   ├── eval_langsmith_northstar.py  # LangSmith experiment runner — Northstar (10 metrics)
 │   ├── run_golden_eval.py       # Minimal runner for LangSmith online evaluator
@@ -189,6 +192,9 @@ Read the files in this order. Each one is heavily commented with the "why".
 | **Agentic routing** | `src/agent.py` | The model *chooses* the tool — the test surface becomes a decision tree |
 | **Multi-step reasoning** | `src/agent.py` | "90 extra days of retention → cost?" needs retrieve **then** calculate |
 | **New failure modes** | `src/agent.py` | Wrong tool, wrong arguments, loops — why agents need more testing than chains |
+| **Tool routing eval** | `src/eval_agent.py` | A correct final answer via wrong tool path is still a routing failure — `tool_hit_rate` separates "got lucky" from "worked correctly" |
+| **Sequence correctness** | `src/eval_agent.py` | For multi-step questions, tool order matters — retrieving after calculating means the expression used a hardcoded value, not a grounded one |
+| **Parametric vs grounded** | `eval/golden_qa_agent.json` (`calculator_only`) | Agent answers simple arithmetic from training knowledge, bypassing the calculator tool — correct answer, unreliable path |
 
 ### Stage 3 — Evaluation (your home turf)
 
@@ -309,7 +315,11 @@ Each day links to a run report or comparison where one exists so you can see rea
 
 4. **Day 4** — Run `agent.py`. Try a lookup question, a math question, and the
    multi-step retention question. Read the trace to see the tool choices.
-   *No HTML report — trace lives in the LangSmith UI.*
+   Then run `eval_agent.py` — this is where the interesting finding surfaces:
+   the agent answers pure arithmetic questions correctly but without calling
+   the calculator tool. Correct answer, wrong path. That distinction is the
+   core of agent QA.
+   *No HTML report — trace lives in the LangSmith UI; eval output is console.*
 
 5. **Day 5** — Run `eval_custom.py`. Read every metric's comment block. Set
    `REPEATS=3` and observe variance.

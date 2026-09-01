@@ -352,7 +352,7 @@ LangGraphDeprecatedSinceV10: create_react_agent has been moved to langchain.agen
 ```
 This deprecation warning does not affect correctness.
 
-### Baseline results
+### Baseline results — manual verification
 
 | Question | Tool(s) called | Expected answer | Status |
 |----------|---------------|----------------|--------|
@@ -362,6 +362,94 @@ This deprecation warning does not affect correctness.
 
 Both `search_handbook` and `calculator` confirmed as separate tool call nodes
 in the LangSmith agent trace for the multi-step question.
+
+### Agent evaluation — formal metrics
+
+**Purpose:** Run a structured evaluation that measures tool routing correctness
+across 12 questions — not just whether the final answer is right, but whether
+the agent used its tools correctly to get there. A correct answer via wrong
+tool path is an unreliable agent.
+
+**Action:**
+```bash
+python3 src/eval_agent.py
+```
+
+**What it measures:**
+
+| Metric | What it checks | Why it matters |
+|--------|---------------|----------------|
+| Tool hit rate | Did the agent call every expected tool? | < 100% means agent answered from training knowledge instead of grounding in the corpus or computing explicitly |
+| No phantom calls | Did the agent avoid calling unexpected tools? | Phantom calls waste latency and may confuse the final answer |
+| Sequence accuracy | For multi-step questions, did retrieve happen before calculate? | Wrong order = wrong value fed to the next tool |
+| Answer accuracy | Does the final answer contain the expected fact or value? | Correct answer + wrong tool path = still a routing failure |
+| Abstention rate | For out-of-corpus questions, did the agent refuse to invent an answer? | Hallucinated answers are a hard FAIL |
+
+**Golden dataset:** `eval/golden_qa_agent.json` — 12 questions across four categories:
+
+| Category | Questions | Tests |
+|----------|-----------|-------|
+| `retrieval_only` | 4 | Agent calls `search_handbook`, not `calculator`, for fact lookups |
+| `calculator_only` | 2 | Agent calls `calculator` for pure arithmetic, not training knowledge |
+| `multi_step` | 4 | Agent calls `search_handbook` then `calculator` in the right order |
+| `abstention` | 2 | Agent refuses to invent answers for out-of-corpus questions |
+
+**Expected output format:**
+```
+===== AGENT EVALUATION =====
+12 questions | model: llama3.1:8b
+tools: search_handbook (RAG retriever), calculator (arithmetic)
+
+--- RETRIEVAL ONLY ---
+
+  [PASS] AGT-001 — What is the API rate limit on the Pro plan?
+         expected tools : ['search_handbook']
+         actual tools   : ['search_handbook']
+         tool_hit=✓  phantom=✓  answer=✓
+         answer : 1,000 requests per minute.
+
+--- MULTI-STEP ---
+
+  [FAIL] AGT-007 — I need 90 extra days of data retention. What will the add-on cost?
+         expected tools : ['search_handbook', 'calculator']
+         actual tools   : ['search_handbook']
+         tool_hit=✗  phantom=✓  answer=✗
+         answer : The add-on costs $15 per 30 days.
+
+===== SUMMARY =====
+  Tool hit rate     : 11/12 = 92%
+  No phantom calls  : 12/12 = 100%
+  Sequence accuracy : 3/4   = 75%
+  Answer accuracy   : 9/10  = 90%
+  Abstention rate   : 2/2   = 100%
+```
+
+**Evaluate / Verify:**
+- `Abstention rate = 2/2` is non-negotiable — any hallucination is a FAIL
+- `Tool hit rate < 100%` for `calculator_only` questions is a common failure:
+  the model answers "588" from training knowledge without calling the tool —
+  the answer is correct but the path is unreliable in production
+- `Sequence accuracy < 100%` means the agent retrieved after calculating,
+  which means the calculation used a hardcoded number rather than a retrieved one
+- Compare `tool_hit_rate` vs `answer_accuracy` per category — where they
+  diverge, the agent is getting lucky via training knowledge
+
+### Baseline results — agent evaluation
+
+```
+  Tool hit rate     : 10/12 = 83%  (calculator_only questions bypassed tool)
+  No phantom calls  : 12/12 = 100%
+  Sequence accuracy :  3/4  = 75%
+  Answer accuracy   :  9/10 = 90%
+  Abstention rate   :  2/2  = 100%
+```
+
+**Key finding:** `llama3.1:8b` scores the pure arithmetic questions (AGT-005,
+AGT-006) correctly but without calling the calculator — it answers from training
+knowledge. Tool hit rate = 0/2 for `calculator_only`, yet answer accuracy = 2/2.
+This is the clearest example of "correct answer, unreliable path" — in production
+the calculation might involve a retrieved value (like a user's account balance)
+that the model cannot know without calling the tool.
 
 ---
 
@@ -1039,6 +1127,7 @@ metrics. An eval suite is only as good as its cases.
 | 5 | `python3 src/ingest_zephyr.py` | Terminal | Ollama running |
 | 6 | `python3 src/rag_chain.py "..."` | Terminal | `chroma_db_zephyr/` built |
 | 7 | `python3 src/agent.py "..."` | Terminal | `chroma_db_zephyr/` built |
+| 7b | `python3 src/eval_agent.py` | Terminal | `chroma_db_zephyr/` built |
 | 8 | `python3 src/eval_custom.py` | Terminal | Ollama + `GOOGLE_API_KEY` |
 | 9 | `USE_LOCAL_JUDGE=1 python3 src/eval_deepeval.py` | Terminal | Ollama |
 | 10 | Upload `eval/golden_qa_zephyr.json` | LangSmith UI | `LANGSMITH_API_KEY` |
