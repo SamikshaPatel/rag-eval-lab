@@ -1,20 +1,23 @@
-# RAG + Agent + Eval Lab — a fully local learning project
+# RAG + Agent + Eval Lab
 
-One tiny project that combines **Stage 1 (RAG)**, **Stage 2 (Agents & tool use)**,
-and **Stage 3 (Evaluation)** from your AI-testing plan. RAG and agents run
-entirely on your machine. Evaluation uses **Gemini 3.6 Flash** as the LLM judge
-(free API key required) and an optional free LangSmith account for tracing and eval UI.
+A portfolio project demonstrating how **QA engineering discipline — controlled experiments, root-cause analysis, regression testing, and metric-driven iteration — applies directly to AI systems.**
 
-The thing you are really learning: **how to test a system that gives a
-different answer every time you run it.** That is the discipline that separates
-AI QA from traditional QA, and evaluation (Stage 3) is where your existing
-testing instincts transfer directly.
+Built with a fully local, free stack across two fictional corpora. The pipeline covers Stage 1 (RAG), Stage 2 (Agents & tool use), and Stage 3 (Evaluation), with 10 metrics, 4 evaluation frameworks, and 4 documented experiment runs.
 
 ---
 
-> **Disclaimer**
->
-> The evaluation scores in this project reflect the capabilities and limitations of the open-source models used — `llama3.1:8b` for generation and `qwen2.5:7b` as the local judge. These are capable models for a fully local, free stack, but they produce lower absolute scores than commercial models such as GPT-4 or Claude. **The goal of this project is not to maximise scores — it is to demonstrate how to build, instrument, and iteratively improve a RAG evaluation pipeline.** The methodology (metric selection, experiment tracking, root-cause analysis, prompt versioning, retrieval tuning) is what transfers to production systems, regardless of which model runs underneath. Scores should be interpreted as relative signals across experiments, not as benchmarks against commercial RAG systems.
+## What this project proves
+
+| Finding | Evidence |
+|---|---|
+| Chunk size is a retrieval trade-off, not a free variable | Run 1 (400-char) vs Run 2 (200-char): relevancy +0.22, faithfulness −0.12 — neither wins unconditionally |
+| A mismatched reranker actively hurts retrieval | Run 3: ms-marco cross-encoder won **0 of 8 metrics** on banking text — domain mismatch matters more than model quality |
+| Small models need explicit reasoning scaffolding in the prompt | llama3.1:8b abstained on NSB-023/024 until a worked inference example was added to the prompt — fixed by prompt v2 |
+| Single-query retrieval fails for comparison questions | NSB-033 (Viewer vs User) required per-entity queries to guarantee both role chunks appeared in top-k |
+| Evaluation framework choice affects the numbers you see | RAGAS context recall = 1.000 vs DeepEval = 0.510 on identical inputs — documented with root-cause analysis |
+| Hallucination is testable and measurable | Abstention rate on 8 out-of-corpus questions: 100% correct refusal across all runs |
+
+> **On scores:** Absolute metric values reflect the open-source models used (`llama3.1:8b` generation, `qwen2.5:7b` judge). The signal that matters is **relative change across runs** — the same discipline used to interpret pass-rate trends in traditional test suites. The methodology transfers to any model stack.
 
 ---
 
