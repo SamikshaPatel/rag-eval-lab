@@ -99,7 +99,7 @@ from config import (
     JUDGE_MODEL, LOCAL_JUDGE_MODEL,
     CHAT_MODEL, EMBED_MODEL, NORTHSTAR_CHUNK_SIZE, NORTHSTAR_CHUNK_OVERLAP,
     RETRIEVAL_K, TEMPERATURE,
-    RERANKER_MODEL, RERANKER_FETCH_K,
+    NORTHSTAR_RUN_NUMBER, NORTHSTAR_PROMPT_RAG_GROUNDING,
     FAITHFULNESS_THRESHOLD, RELEVANCY_THRESHOLD,
     CONTEXTUAL_PRECISION_THRESHOLD, CONTEXTUAL_RECALL_THRESHOLD,
     CONTEXTUAL_RELEVANCY_THRESHOLD, HALLUCINATION_THRESHOLD,
@@ -117,59 +117,59 @@ from judgeUtil import make_judge, abstained as _abstained
 from langchain_ollama import OllamaEmbeddings, ChatOllama
 from langchain_chroma import Chroma
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
-from langchain_core.documents import Document as LCDocument
-from langchain_core.retrievers import BaseRetriever
 from langsmith import traceable
-from sentence_transformers import CrossEncoder
 
 _embeddings = OllamaEmbeddings(model=EMBED_MODEL)
 _vectorstore = Chroma(persist_directory=NORTHSTAR_DB_PATH, embedding_function=_embeddings)
 
-# Cross-encoder reranker — downloads ~85 MB model on first use, then cached locally
-print(f"[reranker] Loading {RERANKER_MODEL} ...")
-_cross_encoder = CrossEncoder(RERANKER_MODEL)
-print("[reranker] Ready.")
+# ---------------------------------------------------------------------------
+# Multi-query retrieval — role disambiguation (fix for NSB-033)
+# When a question compares ≥2 role names (Viewer, User, Administrator, Admin),
+# a single embedding query tends to miss one role's definition chunk because
+# the chunks are semantically similar and k=3 only surfaces one.
+# Fix: run a separate retrieval query for each mentioned role and combine results,
+# guaranteeing each role's definition chunk is included in the context.
+# ---------------------------------------------------------------------------
+_ROLE_TERMS = {"viewer", "user", "administrator", "admin"}
 
 
-class _RerankedRetriever(BaseRetriever):
-    """Fetch RERANKER_FETCH_K chunks via embedding search, rerank with a cross-encoder, keep top RETRIEVAL_K."""
+def _get_contexts(question: str, k: int = RETRIEVAL_K) -> list:
+    retriever = _vectorstore.as_retriever(search_kwargs={"k": k})
+    q_lower = question.lower()
+    mentioned_roles = [r for r in _ROLE_TERMS if r in q_lower]
 
-    def _get_relevant_documents(self, query: str) -> list[LCDocument]:
-        candidates = _vectorstore.similarity_search(query, k=RERANKER_FETCH_K)
-        if not candidates:
-            return []
-        pairs  = [(query, doc.page_content) for doc in candidates]
-        scores = _cross_encoder.predict(pairs)
-        ranked = sorted(zip(scores, candidates), key=lambda x: x[0], reverse=True)
-        return [doc for _, doc in ranked[:RETRIEVAL_K]]
+    if len(mentioned_roles) >= 2:
+        # Separate retrieval per role to guarantee each role's definition is fetched
+        seen, combined = set(), []
+        for role in mentioned_roles:
+            for doc in retriever.invoke(f"{role} role definition access"):
+                if doc.page_content not in seen:
+                    seen.add(doc.page_content)
+                    combined.append(doc)
+        return combined if combined else retriever.invoke(question)
+
+    return retriever.invoke(question)
 
 
-def _get_retriever(k: int = RETRIEVAL_K):   # k kept for API compat; top_n is fixed at RETRIEVAL_K
-    return _RerankedRetriever()
+def _get_retriever(k: int = RETRIEVAL_K):
+    return _vectorstore.as_retriever(search_kwargs={"k": k})
 
 
-_RAG_PROMPT = ChatPromptTemplate.from_template(_load_prompt("rag_grounding_v1.txt"))
+_RAG_PROMPT = ChatPromptTemplate.from_template(_load_prompt(NORTHSTAR_PROMPT_RAG_GROUNDING))
 _llm = ChatOllama(model=CHAT_MODEL, temperature=TEMPERATURE)
 
 
 @traceable(run_type="chain", name="northstar-rag-answer")
 def _answer_northstar(question: str, k: int = RETRIEVAL_K) -> str:
-    retriever = _get_retriever(k=k)
-    chain = (
-        {"context": retriever | (lambda docs: "\n\n".join(d.page_content for d in docs)),
-         "question": RunnablePassthrough()}
-        | _RAG_PROMPT
-        | _llm
-        | StrOutputParser()
-    )
-    return chain.invoke(question)
+    context_docs = _get_contexts(question, k=k)
+    context_str = "\n\n".join(d.page_content for d in context_docs)
+    prompt = _RAG_PROMPT.invoke({"context": context_str, "question": question})
+    return (_llm | StrOutputParser()).invoke(prompt)
 
 
 def answer_with_context(question: str, k: int = RETRIEVAL_K):
-    retriever = _get_retriever(k=k)
-    contexts = retriever.invoke(question)
+    contexts = _get_contexts(question, k=k)
     answer = _answer_northstar(question, k=k)
     return answer, [c.page_content for c in contexts]
 
@@ -418,24 +418,27 @@ def main():
     chat_label  = CHAT_MODEL.replace(":", "-").replace(".", "_")
 
     experiment_prefix = (
-        f"northstar"
+        f"run{NORTHSTAR_RUN_NUMBER}"
+        f"_northstar"
         f"-k{RETRIEVAL_K}"
         f"-chunk{NORTHSTAR_CHUNK_SIZE}o{NORTHSTAR_CHUNK_OVERLAP}"
-        f"-rerank{RERANKER_FETCH_K}"
+        f"-promptv2"
+        f"-mqretrieval"
         f"-{chat_label}"
         f"-judge-{judge_label}"
     )
 
     experiment_metadata = {
+        "run":              NORTHSTAR_RUN_NUMBER,
         "corpus":           "northstar",
         "retrieval_k":      RETRIEVAL_K,
         "chunk_size":       NORTHSTAR_CHUNK_SIZE,
         "chunk_overlap":    NORTHSTAR_CHUNK_OVERLAP,
-        "reranker":         RERANKER_MODEL,
-        "reranker_fetch_k": RERANKER_FETCH_K,
         "embed_model":      EMBED_MODEL,
         "chat_model":       CHAT_MODEL,
         "temperature":      TEMPERATURE,
+        "prompt_version":   NORTHSTAR_PROMPT_RAG_GROUNDING,
+        "query_strategy":   "multi-query-per-role",
         "judge_model":      LOCAL_JUDGE_MODEL if os.getenv("USE_LOCAL_JUDGE") == "1" else JUDGE_MODEL,
         "n_total":          len(golden),
         "n_in_corpus":      sum(1 for q in golden if q["in_corpus"]),

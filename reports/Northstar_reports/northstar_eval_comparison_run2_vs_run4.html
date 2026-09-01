@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Northstar RAG Eval — Run 2 vs Run 4 Comparison</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f4f6f9; color: #1a1a2e; padding: 32px 24px; }
+    .container { max-width: 1200px; margin: 0 auto; }
+
+    /* Header */
+    .header { background: linear-gradient(135deg, #0c2340 0%, #1a3a5c 60%, #0f4c81 100%); color: #fff; border-radius: 12px; padding: 32px 36px; margin-bottom: 28px; }
+    .header h1 { font-size: 1.6rem; font-weight: 700; margin-bottom: 6px; }
+    .header .subtitle { font-size: 0.9rem; opacity: 0.7; margin-bottom: 18px; }
+    .exp-ids { display: flex; gap: 12px; flex-wrap: wrap; }
+    .exp-id { display: inline-block; border-radius: 6px; padding: 4px 12px; font-family: monospace; font-size: 0.8rem; }
+    .exp-id-r1 { background: rgba(96,165,250,0.2); border: 1px solid rgba(96,165,250,0.4); }
+    .exp-id-r2 { background: rgba(251,191,36,0.2); border: 1px solid rgba(251,191,36,0.4); }
+
+    h2 { font-size: 1.05rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #0f4c81; margin-bottom: 14px; padding-bottom: 6px; border-bottom: 2px solid #e2e8f0; }
+
+    /* Config comparison */
+    .config-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 28px; }
+    @media (max-width: 640px) { .config-compare { grid-template-columns: 1fr; } }
+    .config-panel { background: #fff; border-radius: 10px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
+    .config-panel h3 { font-size: 0.85rem; font-weight: 700; margin-bottom: 14px; padding-bottom: 6px; border-bottom: 2px solid; }
+    .config-panel.r1 h3 { color: #1d4ed8; border-color: #bfdbfe; }
+    .config-panel.r2 h3 { color: #92400e; border-color: #fde68a; }
+    .config-row { display: flex; justify-content: space-between; font-size: 0.85rem; padding: 5px 0; border-bottom: 1px solid #f1f5f9; }
+    .config-row:last-child { border-bottom: none; }
+    .config-row .key { color: #64748b; }
+    .config-row .val { font-weight: 600; font-family: monospace; }
+    .config-row.changed .val { color: #d97706; background: #fef3c7; padding: 1px 6px; border-radius: 4px; }
+
+    /* Score badges */
+    .score { display: inline-block; width: 50px; text-align: center; font-weight: 700; font-size: 0.85rem; border-radius: 6px; padding: 3px 0; }
+    .score-high { background: #d1fae5; color: #065f46; }
+    .score-mid  { background: #fef3c7; color: #92400e; }
+    .score-low  { background: #fee2e2; color: #991b1b; }
+    .score-na   { background: #f1f5f9; color: #64748b; }
+
+    .delta { display: inline-block; font-weight: 700; font-size: 0.8rem; border-radius: 4px; padding: 2px 6px; min-width: 54px; text-align: center; }
+    .delta-pos  { background: #d1fae5; color: #065f46; }
+    .delta-neg  { background: #fee2e2; color: #991b1b; }
+    .delta-neu  { background: #f1f5f9; color: #64748b; }
+
+    .winner { display: inline-block; font-size: 0.72rem; font-weight: 700; border-radius: 12px; padding: 2px 8px; white-space: nowrap; }
+    .winner-r1  { background: #dbeafe; color: #1d4ed8; }
+    .winner-r2  { background: #fef3c7; color: #92400e; }
+    .winner-tie { background: #f1f5f9; color: #64748b; }
+
+    /* Category badges */
+    .cat-badge { display: inline-block; border-radius: 4px; padding: 2px 8px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+    .cat-factual    { background: #dbeafe; color: #1d4ed8; }
+    .cat-procedural { background: #d1fae5; color: #065f46; }
+    .cat-comparison { background: #fef3c7; color: #92400e; }
+    .cat-multi_hop  { background: #ede9fe; color: #5b21b6; }
+    .cat-exception  { background: #fee2e2; color: #991b1b; }
+
+    .change-badge { display: inline-block; border-radius: 4px; padding: 2px 8px; font-size: 0.72rem; font-weight: 700; }
+    .change-fix   { background: #d1fae5; color: #065f46; }
+    .change-reg   { background: #fee2e2; color: #991b1b; }
+    .change-same  { background: #f1f5f9; color: #64748b; }
+    .change-mixed { background: #fef3c7; color: #92400e; }
+
+    /* Tables */
+    .section { margin-bottom: 32px; }
+    .table-scroll { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.07); font-size: 0.85rem; }
+    thead { background: #0c2340; color: #fff; }
+    thead th { padding: 11px 10px; text-align: center; font-weight: 600; font-size: 0.75rem; letter-spacing: 0.04em; text-transform: uppercase; }
+    thead th:first-child { text-align: left; padding-left: 14px; }
+    thead .r1-col  { background: #1e40af; }
+    thead .r2-col  { background: #92400e; }
+    thead .delta-col  { background: #374151; }
+    thead .winner-col { background: #1f2937; }
+    tbody tr { border-bottom: 1px solid #f1f5f9; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: #f8fafc; }
+    td { padding: 10px; vertical-align: middle; text-align: center; }
+    td:first-child { text-align: left; padding-left: 14px; font-weight: 500; }
+    .avg-row td { background: #eff6ff; font-weight: 700; border-top: 2px solid #bfdbfe; }
+
+    /* Notable changes table */
+    .id-cell { font-family: monospace; font-size: 0.8rem; color: #64748b; white-space: nowrap; }
+    .question-cell { font-size: 0.83rem; max-width: 280px; }
+
+    /* Targeted fixes section */
+    .fix-cards { display: grid; grid-template-columns: 1fr; gap: 16px; margin-bottom: 28px; }
+    .fix-card { background: #fff; border-radius: 10px; padding: 20px 24px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); border-left: 5px solid #10b981; }
+    .fix-card.partial { border-left-color: #f59e0b; }
+    .fix-card h3 { font-size: 0.9rem; font-weight: 700; color: #1a1a2e; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; }
+    .fix-card h3 .fix-label { font-size: 0.72rem; font-weight: 700; border-radius: 12px; padding: 2px 10px; }
+    .fix-card h3 .fix-label.fixed { background: #d1fae5; color: #065f46; }
+    .fix-card h3 .fix-label.partial { background: #fef3c7; color: #92400e; }
+    .fix-card .fix-row { display: grid; grid-template-columns: 120px 1fr; gap: 8px; font-size: 0.84rem; margin-bottom: 6px; }
+    .fix-card .fix-row:last-child { margin-bottom: 0; }
+    .fix-card .fix-key { color: #64748b; font-weight: 600; }
+    .fix-card .fix-val { color: #1a1a2e; line-height: 1.5; }
+    .fix-card .fix-val.good { color: #065f46; font-weight: 600; }
+    .fix-card .fix-val.bad  { color: #991b1b; font-weight: 600; }
+
+    /* Hallucination note */
+    .note-box { background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px; padding: 16px 20px; margin-bottom: 28px; }
+    .note-box h3 { font-size: 0.85rem; font-weight: 700; color: #92400e; margin-bottom: 8px; }
+    .note-box p { font-size: 0.83rem; color: #78350f; line-height: 1.6; }
+
+    /* Verdict */
+    .verdict-box { background: #fff; border-radius: 12px; padding: 24px 28px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); margin-bottom: 32px; border-left: 5px solid #0f4c81; }
+    .verdict-box h3 { font-size: 1rem; font-weight: 700; color: #0f4c81; margin-bottom: 12px; }
+    .verdict-box p { font-size: 0.88rem; color: #374151; line-height: 1.7; margin-bottom: 8px; }
+    .verdict-box p:last-child { margin-bottom: 0; }
+    .verdict-box strong { color: #1a1a2e; }
+    .verdict-box .recommendation { background: #eff6ff; border-radius: 8px; padding: 12px 16px; margin-top: 14px; font-size: 0.88rem; color: #1e40af; font-weight: 600; }
+
+    /* Insights grid */
+    .insights { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 32px; }
+    @media (max-width: 720px) { .insights { grid-template-columns: 1fr; } }
+    .insight-card { background: #fff; border-radius: 10px; padding: 20px 22px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
+    .insight-card h3 { font-size: 0.85rem; font-weight: 700; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+    .insight-card p { font-size: 0.85rem; color: #374151; line-height: 1.6; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+    .dot-green  { background: #10b981; }
+    .dot-yellow { background: #f59e0b; }
+    .dot-red    { background: #ef4444; }
+    .dot-blue   { background: #3b82f6; }
+
+    /* Footer */
+    .footer { text-align: center; font-size: 0.78rem; color: #94a3b8; padding-top: 16px; border-top: 1px solid #e2e8f0; }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <h1>Northstar Digital Bank &mdash; Run 2 vs Run 4: Prompt + Retrieval Fixes</h1>
+    <div class="subtitle">chunk=200/overlap=40 &nbsp;&mdash;&nbsp; 36 in-corpus questions &nbsp;&mdash;&nbsp; chat: llama3.1:8b &nbsp;&mdash;&nbsp; judge: qwen2.5:7b &nbsp;&mdash;&nbsp; k=3 &nbsp;&mdash;&nbsp; embed: nomic-embed-text</div>
+    <div class="exp-ids">
+      <span class="exp-id exp-id-r1">Run 2 &nbsp;&mdash;&nbsp; chunk200 / prompt v1 / single-query</span>
+      <span class="exp-id exp-id-r2">Run 4 &nbsp;&mdash;&nbsp; chunk200 / prompt v2 / multi-query</span>
+    </div>
+  </div>
+
+  <!-- Config -->
+  <div class="section">
+    <h2>Configuration</h2>
+    <div class="config-compare">
+      <div class="config-panel r1">
+        <h3>Run 2 &mdash; chunk200 / prompt v1 / single-query</h3>
+        <div class="config-row"><span class="key">Chunk Size</span><span class="val">200 chars</span></div>
+        <div class="config-row"><span class="key">Chunk Overlap</span><span class="val">40 chars</span></div>
+        <div class="config-row"><span class="key">Retrieval K</span><span class="val">3</span></div>
+        <div class="config-row"><span class="key">Retrieval Strategy</span><span class="val">single-query</span></div>
+        <div class="config-row"><span class="key">Prompt Version</span><span class="val">v1</span></div>
+        <div class="config-row"><span class="key">Chat Model</span><span class="val">llama3.1:8b</span></div>
+        <div class="config-row"><span class="key">Judge Model</span><span class="val">qwen2.5:7b</span></div>
+        <div class="config-row"><span class="key">Embeddings</span><span class="val">nomic-embed-text</span></div>
+      </div>
+      <div class="config-panel r2">
+        <h3>Run 4 &mdash; chunk200 / prompt v2 / multi-query</h3>
+        <div class="config-row"><span class="key">Chunk Size</span><span class="val">200 chars</span></div>
+        <div class="config-row"><span class="key">Chunk Overlap</span><span class="val">40 chars</span></div>
+        <div class="config-row"><span class="key">Retrieval K</span><span class="val">3</span></div>
+        <div class="config-row changed"><span class="key">Retrieval Strategy</span><span class="val">multi-query per role</span></div>
+        <div class="config-row changed"><span class="key">Prompt Version</span><span class="val">v2 (exception-aware + universal-rule)</span></div>
+        <div class="config-row"><span class="key">Chat Model</span><span class="val">llama3.1:8b</span></div>
+        <div class="config-row"><span class="key">Judge Model</span><span class="val">qwen2.5:7b</span></div>
+        <div class="config-row"><span class="key">Embeddings</span><span class="val">nomic-embed-text</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Overall Metric Comparison -->
+  <div class="section">
+    <h2>Overall Metrics &mdash; 36 In-Corpus Questions</h2>
+    <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Metric</th>
+          <th class="r1-col">Run 2<br>prompt v1 / single-query</th>
+          <th class="r2-col">Run 4<br>prompt v2 / multi-query</th>
+          <th class="delta-col">Delta</th>
+          <th class="winner-col">Winner</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Contextual Precision</td>
+          <td><span class="score score-high">0.94</span></td>
+          <td><span class="score score-high">0.89</span></td>
+          <td><span class="delta delta-neg">&minus;0.05</span></td>
+          <td><span class="winner winner-r1">Run 2</span></td>
+        </tr>
+        <tr>
+          <td>Contextual Recall</td>
+          <td><span class="score score-high">0.93</span></td>
+          <td><span class="score score-high">0.92</span></td>
+          <td><span class="delta delta-neu">&minus;0.01</span></td>
+          <td><span class="winner winner-tie">Tie</span></td>
+        </tr>
+        <tr>
+          <td>Contextual Relevancy</td>
+          <td><span class="score score-mid">0.46</span></td>
+          <td><span class="score score-mid">0.45</span></td>
+          <td><span class="delta delta-neu">&minus;0.01</span></td>
+          <td><span class="winner winner-tie">Tie</span></td>
+        </tr>
+        <tr>
+          <td>Faithfulness</td>
+          <td><span class="score score-mid">0.67</span></td>
+          <td><span class="score score-mid">0.71</span></td>
+          <td><span class="delta delta-pos">+0.04</span></td>
+          <td><span class="winner winner-r2">Run 4</span></td>
+        </tr>
+        <tr>
+          <td>Answer Relevancy</td>
+          <td><span class="score score-high">0.85</span></td>
+          <td><span class="score score-high">0.84</span></td>
+          <td><span class="delta delta-neu">&minus;0.01</span></td>
+          <td><span class="winner winner-tie">Tie</span></td>
+        </tr>
+        <tr>
+          <td>Hallucination</td>
+          <td><span class="score score-mid">0.53</span></td>
+          <td><span class="score score-mid">0.44</span></td>
+          <td><span class="delta delta-neg">&minus;0.09</span></td>
+          <td><span class="winner winner-r1">Run 2 &#9888;</span></td>
+        </tr>
+        <tr>
+          <td>Correctness</td>
+          <td><span class="score score-high">0.82</span></td>
+          <td><span class="score score-high">0.87</span></td>
+          <td><span class="delta delta-pos">+0.05</span></td>
+          <td><span class="winner winner-r2">Run 4</span></td>
+        </tr>
+        <tr>
+          <td>Completeness</td>
+          <td><span class="score score-high">0.79</span></td>
+          <td><span class="score score-high">0.86</span></td>
+          <td><span class="delta delta-pos">+0.07</span></td>
+          <td><span class="winner winner-r2">Run 4 ✦</span></td>
+        </tr>
+        <tr class="avg-row">
+          <td>Summary</td>
+          <td colspan="4" style="text-align:left; padding-left:10px; color:#374151; font-size:0.85rem;">
+            Run 4 wins: 3 metrics (Faithfulness, Correctness, Completeness) &nbsp;|&nbsp;
+            Run 2 wins: 2 metrics (Ctx Precision, Hallucination) &nbsp;|&nbsp;
+            Ties: 3
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+    <p style="font-size:0.78rem;color:#94a3b8;margin-top:8px;">✦ = largest magnitude gain (&gt;0.05) &nbsp;&nbsp; &#9888; = metric direction note — see Hallucination section below</p>
+  </div>
+
+  <!-- Hallucination Note -->
+  <div class="note-box">
+    <h3>Hallucination Metric Direction Note</h3>
+    <p>A <code>DeprecationWarning</code> was raised during both runs: <em>"HallucinationMetric now scores in the same direction as every other deepeval metric: 1 is a pass."</em> Both Run 2 and Run 4 used the same library version, so both use the new direction (higher = less hallucination). The regression from 0.53 &rarr; 0.44 reflects that prompt v2's logical-inference instructions cause the model to add more inferred statements not literally present in the retrieved context — a real tradeoff, not a measurement artifact.</p>
+  </div>
+
+  <!-- Targeted Fixes -->
+  <div class="section">
+    <h2>Targeted Fixes: What Changed Between Run 2 and Run 4</h2>
+    <div class="fix-cards">
+
+      <div class="fix-card">
+        <h3>NSB-023 &mdash; "If an international wire is only CAD 5,000, can it use Single Approval?" <span class="fix-label fixed">FIXED</span></h3>
+        <div class="fix-row"><span class="fix-key">Run 2 status</span><span class="fix-val bad">FAILING &mdash; model abstained, correctness = 0.00</span></div>
+        <div class="fix-row"><span class="fix-key">Run 4 status</span><span class="fix-val good">FIXED &mdash; answer: "No, because every international wire requires Dual Approval", correctness = 1.00</span></div>
+        <div class="fix-row"><span class="fix-key">Run 4 scores</span><span class="fix-val">prec=1.00, rec=1.00, rel=0.14, faith=1.00, AR=0.00, hall=0.33, corr=1.00, comp=1.00</span></div>
+        <div class="fix-row"><span class="fix-key">AR=0.00 note</span><span class="fix-val">Known judge artifact: qwen2.5:7b could not evaluate "No, because&hellip;" style answers. Correctness=1.00 confirms the answer is correct.</span></div>
+        <div class="fix-row"><span class="fix-key">Fix mechanism</span><span class="fix-val">Prompt v2 added a universal-rule inference instruction with a worked example. A single instruction was sufficient for llama3.1:8b to reason through the "always requires Dual Approval regardless of amount" rule.</span></div>
+      </div>
+
+      <div class="fix-card">
+        <h3>NSB-024 &mdash; "Can a business configure a threshold of CAD 20,000?" <span class="fix-label fixed">FIXED</span></h3>
+        <div class="fix-row"><span class="fix-key">Run 2 status</span><span class="fix-val bad">FAILING &mdash; model answered the general rule, missed the CAD 10,000 cap, correctness low</span></div>
+        <div class="fix-row"><span class="fix-key">Run 4 status</span><span class="fix-val good">FIXED &mdash; answer references the CAD 10,000 cap explicitly, correctness = 1.00</span></div>
+        <div class="fix-row"><span class="fix-key">Fix mechanism</span><span class="fix-val">Same prompt v2 exception-awareness instruction: model now checks for overriding constraints before stating the general rule. Recognises that CAD 20,000 exceeds the hard cap of CAD 10,000.</span></div>
+      </div>
+
+      <div class="fix-card partial">
+        <h3>NSB-033 &mdash; "What is the difference between a Viewer and a User?" <span class="fix-label partial">PARTIALLY FIXED</span></h3>
+        <div class="fix-row"><span class="fix-key">Run 2 status</span><span class="fix-val bad">FAILING &mdash; Viewer chunk not retrieved, correctness = 0.00</span></div>
+        <div class="fix-row"><span class="fix-key">Run 4 status</span><span class="fix-val">PARTIALLY FIXED &mdash; both role definitions now retrieved, correctness = 0.80</span></div>
+        <div class="fix-row"><span class="fix-key">Run 4 scores</span><span class="fix-val">prec=0.33, rec=0.50, rel=0.38, faith=0.33, AR=1.00, hall=0.50, corr=0.80, comp=0.80</span></div>
+        <div class="fix-row"><span class="fix-key">Precision drop note</span><span class="fix-val">Multi-query brings more diverse chunks alongside the two role definitions, reducing precision. The recall and correctness gains outweigh the precision cost.</span></div>
+        <div class="fix-row"><span class="fix-key">Fix mechanism</span><span class="fix-val">Multi-query retrieval: a separate <code>similarity_search</code> per mentioned role name ("Viewer", "User") now surfaces both definition chunks that a single combined query failed to retrieve.</span></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Notable Per-Question Data -->
+  <div class="section">
+    <h2>Notable Per-Question Scores (Run 4)</h2>
+    <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th style="text-align:left">Question</th>
+          <th>Category</th>
+          <th class="r1-col">Ctx Prec</th>
+          <th class="r1-col">Ctx Rec</th>
+          <th class="r1-col">Ctx Rel</th>
+          <th class="r2-col">Faith</th>
+          <th class="r2-col">Ans Rel</th>
+          <th class="r2-col">Hall</th>
+          <th class="r2-col">Corr</th>
+          <th class="r2-col">Comp</th>
+          <th>Change</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="id-cell">NSB-023</td>
+          <td class="question-cell">If an international wire is only CAD 5,000, can it use Single Approval?</td>
+          <td><span class="cat-badge cat-exception">exception</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.14</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-low">0.33</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="change-badge change-fix">FIXED</span></td>
+        </tr>
+        <tr>
+          <td class="id-cell">NSB-024</td>
+          <td class="question-cell">Can a business configure a threshold of CAD 20,000?</td>
+          <td><span class="cat-badge cat-exception">exception</span></td>
+          <td>&mdash;</td>
+          <td>&mdash;</td>
+          <td>&mdash;</td>
+          <td>&mdash;</td>
+          <td>&mdash;</td>
+          <td>&mdash;</td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="change-badge change-fix">FIXED</span></td>
+        </tr>
+        <tr>
+          <td class="id-cell">NSB-033</td>
+          <td class="question-cell">What is the difference between a Viewer and a User?</td>
+          <td><span class="cat-badge cat-comparison">comparison</span></td>
+          <td><span class="score score-low">0.33</span></td>
+          <td><span class="score score-mid">0.50</span></td>
+          <td><span class="score score-low">0.38</span></td>
+          <td><span class="score score-low">0.33</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-mid">0.50</span></td>
+          <td><span class="score score-high">0.80</span></td>
+          <td><span class="score score-high">0.80</span></td>
+          <td><span class="change-badge change-mixed">PARTIAL FIX</span></td>
+        </tr>
+        <tr>
+          <td class="id-cell">NSB-034</td>
+          <td class="question-cell">A user is disabled while logged in &mdash; what happens to their active session?</td>
+          <td><span class="cat-badge cat-procedural">procedural</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="change-badge change-same">INVESTIGATE</span></td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+    <p style="font-size:0.78rem;color:#94a3b8;margin-top:8px;">NSB-023: AR=0.00 is a known judge artifact (see fix notes above). NSB-034: all-zero scores across every metric are highly suspicious for a factual question with a clear handbook answer &mdash; likely an evaluation infrastructure failure rather than a pipeline failure.</p>
+  </div>
+
+  <!-- Verdict -->
+  <div class="verdict-box">
+    <h3>Verdict</h3>
+    <p><strong>Run 4 wins on reference-based accuracy:</strong> Correctness improved +0.05 (0.82 &rarr; 0.87), Completeness improved +0.07 (0.79 &rarr; 0.86), and Faithfulness improved +0.04 (0.67 &rarr; 0.71). The two persistent exception failures (NSB-023, NSB-024) are now fully resolved with correctness=1.00 each.</p>
+    <p><strong>Run 2 holds an advantage on hallucination and precision:</strong> Hallucination score dropped from 0.53 &rarr; 0.44 in Run 4, and Contextual Precision fell by 0.05. The model stayed closer to the literal retrieved context when given a simpler prompt.</p>
+    <p><strong>The core tradeoff:</strong> Prompt v2 makes the model smarter at applying policy rules (universal-rule inference, exception detection) but slightly less conservative about staying strictly within the retrieved text. Instructions that say "infer from universal rules" push the model to go beyond the literal context &mdash; which improves correctness but increases inferred claims the hallucination metric penalises.</p>
+    <p><strong>NSB-034 all-zero scores require investigation:</strong> A clear factual question scoring 0 across all 8 metrics in Run 4 is most likely an evaluation infrastructure failure. Re-running NSB-034 in isolation is recommended before drawing any conclusions about that question.</p>
+    <div class="recommendation">For a banking policy assistant, correctness and completeness matter most. Run 4 is the recommended configuration.</div>
+  </div>
+
+  <!-- Insight Cards -->
+  <div class="section">
+    <h2>Key Insights</h2>
+    <div class="insights">
+      <div class="insight-card">
+        <h3><span class="dot dot-green"></span> Prompt v2 fixed exception reasoning</h3>
+        <p>NSB-023 and NSB-024 now score correctness=1.00. A single instruction with a worked example was enough for llama3.1:8b to reason through universal rules. The model now correctly identifies that "every international wire requires Dual Approval" is a universal constraint that overrides the amount-based threshold — without needing the rule to be stated literally in the retrieved chunk.</p>
+      </div>
+      <div class="insight-card">
+        <h3><span class="dot dot-yellow"></span> Multi-query retrieval partially fixed NSB-033</h3>
+        <p>Both Viewer and User definition chunks are now retrieved by issuing a separate <code>similarity_search</code> per role name. Correctness improved from 0.00 &rarr; 0.80. Precision dropped slightly (0.33) because multi-query brings more diverse chunks alongside the two target definitions &mdash; a predictable tradeoff. Increasing k or adding a deduplication step could recover precision without sacrificing recall.</p>
+      </div>
+      <div class="insight-card">
+        <h3><span class="dot dot-red"></span> Faithfulness-hallucination tradeoff</h3>
+        <p>Prompt v2 improved faithfulness (+0.04) but worsened hallucination (&minus;0.09). This is not a contradiction: faithfulness measures whether claims are supported by the retrieved context, while hallucination measures whether the model introduces statements not literally present. Instructions that say "infer from universal rules" push the model to generate correct logical conclusions that go slightly beyond the literal text — raising both faithfulness (the inference chain is sound) and the hallucination penalty (the conclusion is inferred, not quoted).</p>
+      </div>
+      <div class="insight-card">
+        <h3><span class="dot dot-blue"></span> NSB-034 all-zero scores warrant investigation</h3>
+        <p>A question with a clear answer in the handbook scored 0 across all 8 metrics in Run 4. This is highly suspicious: correctness=0.00, faithfulness=0.00, and answer relevancy=0.00 simultaneously suggests the evaluation itself failed rather than the pipeline. Possible causes: judge timeout, malformed output from qwen2.5:7b on this specific question, or a framework exception that silently zeroed scores. Recommended action: re-run NSB-034 in isolation before treating it as a genuine regression.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    Northstar Digital Bank RAG Evaluation &mdash; Run 2 vs Run 4 (prompt v1/single-query vs prompt v2/multi-query) &mdash; chunk200/overlap40 &mdash; judge: qwen2.5:7b (Ollama) &mdash; 2026-09-01
+  </div>
+
+</div>
+</body>
+</html>

@@ -41,6 +41,11 @@ CHUNK_OVERLAP = 80    # overlap between chunks
 NORTHSTAR_CHUNK_SIZE    = 200
 NORTHSTAR_CHUNK_OVERLAP = 40
 
+# --- Experiment run number ---------------------------------------------------
+# Increment this before each eval run so LangSmith experiment names are sortable.
+# Format: run{N}_northstar-...   e.g. run4_northstar-k3-chunk200...
+NORTHSTAR_RUN_NUMBER = 4
+
 # --- Retrieval & generation --------------------------------------------------
 RETRIEVAL_K = 3     # chunks kept after reranking (or fetched if no reranker)
 TEMPERATURE = 0.0   # generation temperature (0 = most deterministic)
@@ -54,10 +59,11 @@ RERANKER_FETCH_K = 10   # initial candidate pool before reranking
 
 # --- Prompt filenames --------------------------------------------------------
 # Update the string here when you version a prompt; no logic files change.
-PROMPT_RAG_GROUNDING      = "rag_grounding_v1.txt"
-PROMPT_JUDGE_FAITHFULNESS = "judge_faithfulness_v1.txt"
-PROMPT_JUDGE_CORRECTNESS  = "judge_correctness_v1.txt"
-PROMPT_JUDGE_COMPLETENESS = "judge_completeness_v1.txt"
+PROMPT_RAG_GROUNDING           = "rag_grounding_v1.txt"   # Zephyr corpus
+NORTHSTAR_PROMPT_RAG_GROUNDING = "rag_grounding_v2.txt"   # Northstar corpus (exception-aware)
+PROMPT_JUDGE_FAITHFULNESS      = "judge_faithfulness_v1.txt"
+PROMPT_JUDGE_CORRECTNESS       = "judge_correctness_v1.txt"
+PROMPT_JUDGE_COMPLETENESS      = "judge_completeness_v1.txt"
 
 # --- Metric thresholds (pass/fail boundary; raw scores are always logged) ----
 FAITHFULNESS_THRESHOLD         = 0.7

@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Zephyr Analytics — RAGAS vs DeepEval Framework Comparison</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f4f6f9;
+      color: #1a1a2e;
+      padding: 32px 24px;
+    }
+
+    .container { max-width: 1100px; margin: 0 auto; }
+
+    /* ── Header ── */
+    .header {
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 60%, #0f3460 100%);
+      color: #fff;
+      border-radius: 12px;
+      padding: 32px 36px;
+      margin-bottom: 28px;
+    }
+    .header h1 { font-size: 1.6rem; font-weight: 700; margin-bottom: 6px; }
+    .header .subtitle { font-size: 0.9rem; opacity: 0.7; margin-bottom: 18px; }
+    .header .exp-id {
+      display: inline-block;
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 6px;
+      padding: 4px 12px;
+      font-family: monospace;
+      font-size: 0.85rem;
+    }
+
+    /* ── Config grid ── */
+    .config-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+    .config-card {
+      background: #fff;
+      border-radius: 10px;
+      padding: 16px 18px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+      border-left: 4px solid #0f3460;
+    }
+    .config-card .label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: #888; margin-bottom: 4px; }
+    .config-card .value { font-size: 1.05rem; font-weight: 600; color: #1a1a2e; font-family: monospace; }
+
+    /* ── Section titles ── */
+    h2 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #0f3460;
+      margin-bottom: 14px;
+      padding-bottom: 6px;
+      border-bottom: 2px solid #e2e8f0;
+    }
+
+    /* ── Score helpers ── */
+    .score {
+      display: inline-block;
+      width: 52px;
+      text-align: center;
+      font-weight: 700;
+      font-size: 0.9rem;
+      border-radius: 6px;
+      padding: 3px 0;
+    }
+    .score-high  { background: #d1fae5; color: #065f46; }
+    .score-mid   { background: #fef3c7; color: #92400e; }
+    .score-low   { background: #fee2e2; color: #991b1b; }
+    .score-na    { background: #f1f5f9; color: #64748b; }
+
+    /* ── Framework-colored scores ── */
+    .score-ragas {
+      display: inline-block;
+      width: 60px;
+      text-align: center;
+      font-weight: 700;
+      font-size: 0.95rem;
+      border-radius: 6px;
+      padding: 4px 0;
+      background: #dbeafe;
+      color: #1d4ed8;
+    }
+    .score-deepeval {
+      display: inline-block;
+      width: 60px;
+      text-align: center;
+      font-weight: 700;
+      font-size: 0.95rem;
+      border-radius: 6px;
+      padding: 4px 0;
+      background: #d1fae5;
+      color: #065f46;
+    }
+    .delta-pos {
+      display: inline-block;
+      width: 60px;
+      text-align: center;
+      font-weight: 700;
+      font-size: 0.9rem;
+      border-radius: 6px;
+      padding: 4px 0;
+      background: #eff6ff;
+      color: #1d4ed8;
+    }
+    .delta-neg {
+      display: inline-block;
+      width: 60px;
+      text-align: center;
+      font-weight: 700;
+      font-size: 0.9rem;
+      border-radius: 6px;
+      padding: 4px 0;
+      background: #f0fdf4;
+      color: #065f46;
+    }
+    .delta-small {
+      display: inline-block;
+      width: 60px;
+      text-align: center;
+      font-weight: 700;
+      font-size: 0.9rem;
+      border-radius: 6px;
+      padding: 4px 0;
+      background: #f1f5f9;
+      color: #475569;
+    }
+
+    .badge {
+      display: inline-block;
+      border-radius: 20px;
+      padding: 3px 12px;
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+    .badge-ragas { background: #dbeafe; color: #1d4ed8; }
+    .badge-deepeval { background: #d1fae5; color: #065f46; }
+
+    /* ── Main results table ── */
+    .section { margin-bottom: 32px; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+      font-size: 0.875rem;
+    }
+    thead { background: #0f3460; color: #fff; }
+    thead th {
+      padding: 12px 14px;
+      text-align: center;
+      font-weight: 600;
+      font-size: 0.78rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    thead th:first-child { text-align: left; }
+    thead .th-ragas { background: #1e40af; }
+    thead .th-deepeval { background: #065f46; }
+    thead .th-delta { background: #374151; }
+    tbody tr { border-bottom: 1px solid #f1f5f9; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: #f8fafc; }
+    td { padding: 11px 14px; vertical-align: middle; }
+    td:not(:first-child) { text-align: center; }
+    .metric-cell { font-weight: 600; color: #1a1a2e; }
+
+    /* ── Averages row ── */
+    .avg-row td {
+      background: #eff6ff;
+      font-weight: 700;
+      border-top: 2px solid #bfdbfe;
+    }
+
+    /* ── Root cause analysis cards ── */
+    .rca-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 32px; }
+    @media (max-width: 700px) { .rca-grid { grid-template-columns: 1fr; } }
+
+    .rca-card {
+      background: #fff;
+      border-radius: 10px;
+      padding: 20px 22px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+    }
+    .rca-card h3 {
+      font-size: 0.9rem;
+      font-weight: 700;
+      margin-bottom: 12px;
+      color: #1a1a2e;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .rca-card .delta-badge {
+      font-size: 0.78rem;
+      font-weight: 700;
+      border-radius: 20px;
+      padding: 2px 10px;
+    }
+    .rca-card .delta-badge-ragas { background: #dbeafe; color: #1d4ed8; }
+    .rca-card .delta-badge-deepeval { background: #d1fae5; color: #065f46; }
+    .rca-card .delta-badge-neutral { background: #f1f5f9; color: #475569; }
+
+    .rca-row {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+    .rca-framework-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      min-width: 80px;
+      padding-top: 2px;
+    }
+    .rca-framework-label.ragas { color: #1d4ed8; }
+    .rca-framework-label.deepeval { color: #065f46; }
+    .rca-framework-label.result { color: #7c3aed; }
+    .rca-text { font-size: 0.83rem; color: #374151; line-height: 1.5; }
+
+    /* ── Trade-off table ── */
+    .tradeoff-table thead { background: #1e293b; }
+    .tradeoff-table td:first-child { font-weight: 600; color: #374151; }
+    .tradeoff-table .ragas-col { color: #1d4ed8; font-weight: 500; }
+    .tradeoff-table .deepeval-col { color: #065f46; font-weight: 500; }
+
+    /* ── Recommendation box ── */
+    .recommendation {
+      background: linear-gradient(135deg, #1e3a5f 0%, #1e3a5f 100%);
+      border-radius: 10px;
+      padding: 24px 28px;
+      margin-bottom: 32px;
+      color: #fff;
+    }
+    .recommendation h3 {
+      font-size: 0.9rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 12px;
+      opacity: 0.8;
+    }
+    .recommendation p {
+      font-size: 0.9rem;
+      line-height: 1.7;
+      opacity: 0.92;
+    }
+
+    /* ── Same judge section ── */
+    .same-judge-box {
+      background: #fff;
+      border-radius: 10px;
+      padding: 20px 24px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+      border-left: 4px solid #7c3aed;
+      margin-bottom: 32px;
+    }
+    .same-judge-box h3 {
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: #7c3aed;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 10px;
+    }
+    .same-judge-box p { font-size: 0.875rem; color: #374151; line-height: 1.65; }
+
+    /* ── Insights ── */
+    .insights { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 32px; }
+    @media (max-width: 680px) { .insights { grid-template-columns: 1fr; } }
+
+    .insight-card {
+      background: #fff;
+      border-radius: 10px;
+      padding: 20px 22px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+    }
+    .insight-card .insight-num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      background: #0f3460;
+      color: #fff;
+      border-radius: 50%;
+      font-size: 0.75rem;
+      font-weight: 700;
+      margin-right: 8px;
+      flex-shrink: 0;
+    }
+    .insight-card h3 { font-size: 0.85rem; font-weight: 700; margin-bottom: 10px; display: flex; align-items: flex-start; gap: 0; }
+    .insight-card p { font-size: 0.85rem; color: #374151; line-height: 1.55; }
+
+    .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+    .dot-blue { background: #3b82f6; }
+    .dot-green { background: #10b981; }
+
+    /* ── Footer ── */
+    .footer {
+      text-align: center;
+      font-size: 0.78rem;
+      color: #94a3b8;
+      padding-top: 16px;
+      border-top: 1px solid #e2e8f0;
+    }
+
+    /* ── Framework legend pills ── */
+    .framework-legend {
+      display: flex;
+      gap: 14px;
+      margin-top: 14px;
+    }
+    .legend-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 20px;
+      padding: 5px 14px;
+      font-size: 0.82rem;
+      font-weight: 700;
+    }
+    .legend-pill-ragas { background: rgba(59,130,246,0.18); color: #93c5fd; }
+    .legend-pill-deepeval { background: rgba(16,185,129,0.18); color: #6ee7b7; }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <h1>Zephyr Analytics — RAGAS vs DeepEval Framework Comparison</h1>
+    <div class="subtitle">Same corpus &nbsp;·&nbsp; Same model &nbsp;·&nbsp; Same judge &nbsp;·&nbsp; Different framework = different scores</div>
+    <span class="exp-id">ragas-vs-deepeval · chunk400o80 · llama3.1:8b · judge=qwen2.5:7b · k=3</span>
+    <div class="framework-legend">
+      <span class="legend-pill legend-pill-ragas"><span class="dot" style="background:#93c5fd;"></span> RAGAS</span>
+      <span class="legend-pill legend-pill-deepeval"><span class="dot" style="background:#6ee7b7;"></span> DeepEval</span>
+    </div>
+  </div>
+
+  <!-- Config -->
+  <div class="section">
+    <h2>Experiment Configuration — Identical for Both Frameworks</h2>
+    <div class="config-grid">
+      <div class="config-card"><div class="label">Corpus</div><div class="value">Zephyr Analytics</div></div>
+      <div class="config-card"><div class="label">Questions Used</div><div class="value">6 in-corpus</div></div>
+      <div class="config-card"><div class="label">Chunk Size</div><div class="value">400 chars</div></div>
+      <div class="config-card"><div class="label">Chunk Overlap</div><div class="value">80 chars</div></div>
+      <div class="config-card"><div class="label">Embed Model</div><div class="value">nomic-embed-text</div></div>
+      <div class="config-card"><div class="label">Chat Model</div><div class="value">llama3.1:8b</div></div>
+      <div class="config-card"><div class="label">Retrieval k</div><div class="value">3</div></div>
+      <div class="config-card"><div class="label">Temperature</div><div class="value">0.0</div></div>
+      <div class="config-card"><div class="label">Judge Model</div><div class="value">qwen2.5:7b</div></div>
+      <div class="config-card"><div class="label">Judge Mode</div><div class="value">USE_LOCAL_JUDGE=1</div></div>
+      <div class="config-card"><div class="label">Run Date</div><div class="value">2026-09-01</div></div>
+    </div>
+  </div>
+
+  <!-- Side-by-side scores -->
+  <div class="section">
+    <h2>Score Comparison — 4 Overlapping Metrics</h2>
+    <table>
+      <thead>
+        <tr>
+          <th style="text-align:left;">Metric</th>
+          <th class="th-ragas">RAGAS</th>
+          <th class="th-deepeval">DeepEval</th>
+          <th class="th-delta">Delta (RAGAS − DeepEval)</th>
+          <th class="th-delta">Winner</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="metric-cell">Faithfulness</td>
+          <td><span class="score-ragas">0.833</span></td>
+          <td><span class="score-deepeval">0.580</span></td>
+          <td><span class="delta-pos">+0.253</span></td>
+          <td><span class="badge badge-ragas">RAGAS</span></td>
+        </tr>
+        <tr>
+          <td class="metric-cell">Answer Relevancy</td>
+          <td><span class="score-ragas">0.664</span></td>
+          <td><span class="score-deepeval">0.830</span></td>
+          <td><span class="delta-neg">−0.166</span></td>
+          <td><span class="badge badge-deepeval">DeepEval</span></td>
+        </tr>
+        <tr>
+          <td class="metric-cell">Context Precision</td>
+          <td><span class="score-ragas">0.889</span></td>
+          <td><span class="score-deepeval">0.830</span></td>
+          <td><span class="delta-small">+0.059</span></td>
+          <td><span class="badge" style="background:#f1f5f9;color:#475569;">~Tied</span></td>
+        </tr>
+        <tr>
+          <td class="metric-cell">Context Recall</td>
+          <td><span class="score-ragas">1.000</span></td>
+          <td><span class="score-deepeval">0.510</span></td>
+          <td><span class="delta-pos">+0.490</span></td>
+          <td><span class="badge" style="background:#fef3c7;color:#92400e;">Investigate</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Root cause analysis -->
+  <div class="section">
+    <h2>Root-Cause Analysis — Why Each Metric Diverges</h2>
+    <div class="rca-grid">
+
+      <div class="rca-card">
+        <h3>
+          Faithfulness
+          <span class="delta-badge delta-badge-ragas">+0.253 RAGAS advantage</span>
+        </h3>
+        <div class="rca-row">
+          <span class="rca-framework-label ragas">RAGAS</span>
+          <span class="rca-text">Decomposes the answer into individual atomic claims and checks each one against the context separately. A claim passes if semantically similar text exists in the context. Final score = (claims supported / total claims). Partial credit is awarded per claim.</span>
+        </div>
+        <div class="rca-row">
+          <span class="rca-framework-label deepeval">DeepEval</span>
+          <span class="rca-text">Evaluates faithfulness holistically — one LLM call rates whether the full answer is grounded. Small models such as qwen2.5:7b tend to be stricter in this single-pass evaluation and penalise any ungrounded phrase in the whole answer.</span>
+        </div>
+        <div class="rca-row">
+          <span class="rca-framework-label result">Result</span>
+          <span class="rca-text">RAGAS is more lenient because each claim is evaluated independently and partial credit is awarded. DeepEval's single-shot evaluation penalises any ungrounded phrase in the whole answer.</span>
+        </div>
+      </div>
+
+      <div class="rca-card">
+        <h3>
+          Answer Relevancy
+          <span class="delta-badge delta-badge-deepeval">−0.166 DeepEval advantage</span>
+        </h3>
+        <div class="rca-row">
+          <span class="rca-framework-label ragas">RAGAS</span>
+          <span class="rca-text">Uses a novel reverse-generation approach: generates 3 synthetic questions from the answer, then computes cosine similarity between those synthetic questions and the original question. If the answer covers multiple aspects, the synthetic questions may drift from the original. Detailed answers get penalised.</span>
+        </div>
+        <div class="rca-row">
+          <span class="rca-framework-label deepeval">DeepEval</span>
+          <span class="rca-text">Makes a direct LLM judgment: "does this answer address this question?" — one call, binary-style reasoning. Small models are good at this direct comparison and reward answers that stay on-topic.</span>
+        </div>
+        <div class="rca-row">
+          <span class="rca-framework-label result">Result</span>
+          <span class="rca-text">RAGAS penalises answers that are more comprehensive than the question requires. DeepEval rewards answers that stay on-topic.</span>
+        </div>
+      </div>
+
+      <div class="rca-card">
+        <h3>
+          Context Precision
+          <span class="delta-badge delta-badge-neutral">+0.059 — within noise</span>
+        </h3>
+        <div class="rca-row">
+          <span class="rca-framework-label ragas">RAGAS</span>
+          <span class="rca-text">Checks relevance chunk-by-chunk: each retrieved chunk is independently assessed for relevance to the question. Score is aggregated across chunks with rank-weighting.</span>
+        </div>
+        <div class="rca-row">
+          <span class="rca-framework-label deepeval">DeepEval</span>
+          <span class="rca-text">Evaluates the context set holistically in a single LLM call, asking whether the retrieved content as a whole is precise relative to the question.</span>
+        </div>
+        <div class="rca-row">
+          <span class="rca-framework-label result">Result</span>
+          <span class="rca-text">Both frameworks roughly agree on retrieval precision. The small difference (0.059) is within noise range for a 6-question set and is likely attributable to prompting style rather than a real pipeline difference. When two frameworks agree, the signal is trustworthy.</span>
+        </div>
+      </div>
+
+      <div class="rca-card" style="border-left: 3px solid #f59e0b;">
+        <h3>
+          Context Recall
+          <span class="delta-badge" style="background:#fef3c7;color:#92400e;">+0.490 — largest divergence</span>
+        </h3>
+        <div class="rca-row">
+          <span class="rca-framework-label ragas">RAGAS</span>
+          <span class="rca-text">Checks each sentence in the reference answer: can this sentence be attributed to the retrieved context? Attributability is checked via LLM with semantic matching. Score = attributable sentences / total sentences. Result: 1.000 = every sentence in every reference was found in the retrieved context.</span>
+        </div>
+        <div class="rca-row">
+          <span class="rca-framework-label deepeval">DeepEval</span>
+          <span class="rca-text">Checks whether the context contains enough information to generate the full expected output. qwen2.5:7b evaluates this as a holistic judgment and is stricter — it considers whether all specific facts and numbers are present, not just semantic attributability. Score: 0.51.</span>
+        </div>
+        <div class="rca-row">
+          <span class="rca-framework-label result">Result</span>
+          <span class="rca-text"><strong>Most important divergence for practitioners.</strong> RAGAS recall=1.0 might give false confidence. RAGAS scores 1.000 because reference sentences are semantically present in the Zephyr context (chunk400 is large enough to contain full facts). DeepEval's stricter check (0.51) reveals the retriever only reliably surfaces all needed specifics half the time.</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Same judge, different scores -->
+  <div class="same-judge-box">
+    <h3>Why the Same Judge Model Produces Different Scores</h3>
+    <p>
+      Both frameworks used <strong>qwen2.5:7b</strong> (via Ollama, <code>USE_LOCAL_JUDGE=1</code>) as the judge model, yet produced very different scores — particularly on Faithfulness (+0.253) and Context Recall (+0.490). The judge model is only one component of the evaluation pipeline. The framework's <strong>prompting strategy</strong>, <strong>decomposition approach</strong>, and <strong>scoring aggregation method</strong> all affect the final number independently of which model answers the prompt. RAGAS constructs multi-step decomposition chains and sends multiple targeted sub-prompts to the judge; DeepEval sends fewer, simpler prompts and aggregates differently. This is why practitioners should run both frameworks and treat divergence as signal — not noise. If you only ran one framework, you would not know whether your score reflects your pipeline or the framework's evaluation lens.
+    </p>
+  </div>
+
+  <!-- Framework trade-off table -->
+  <div class="section">
+    <h2>Framework Trade-Off Comparison</h2>
+    <table class="tradeoff-table">
+      <thead>
+        <tr>
+          <th style="text-align:left;">Property</th>
+          <th class="th-ragas">RAGAS</th>
+          <th class="th-deepeval">DeepEval</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="metric-cell">Internal methodology</td>
+          <td class="ragas-col">Decompose → check each part</td>
+          <td class="deepeval-col">Holistic single/dual LLM call</td>
+        </tr>
+        <tr>
+          <td class="metric-cell">LLM calls per metric</td>
+          <td class="ragas-col">Higher (3–5 sub-calls)</td>
+          <td class="deepeval-col">Lower (1–2 calls)</td>
+        </tr>
+        <tr>
+          <td class="metric-cell">Partial credit</td>
+          <td class="ragas-col">Yes — per-claim or per-sentence</td>
+          <td class="deepeval-col">Yes but single-shot</td>
+        </tr>
+        <tr>
+          <td class="metric-cell">Integration style</td>
+          <td class="ragas-col">Dataset-level, returns DataFrame</td>
+          <td class="deepeval-col">Test-case level, pytest-style</td>
+        </tr>
+        <tr>
+          <td class="metric-cell">LangSmith integration</td>
+          <td class="ragas-col">Manual</td>
+          <td class="deepeval-col">Native evaluator pattern</td>
+        </tr>
+        <tr>
+          <td class="metric-cell">Local model reliability</td>
+          <td class="ragas-col">Variable — multi-step prompts fail more with small models</td>
+          <td class="deepeval-col">More reliable — simpler prompts</td>
+        </tr>
+        <tr>
+          <td class="metric-cell">Scoring direction</td>
+          <td class="ragas-col">All metrics: higher = better</td>
+          <td class="deepeval-col">All metrics: higher = better</td>
+        </tr>
+        <tr>
+          <td class="metric-cell">Best for</td>
+          <td class="ragas-col">Batch dataset evaluation, research</td>
+          <td class="deepeval-col">Per-question CI/CD, LangSmith experiments</td>
+        </tr>
+        <tr>
+          <td class="metric-cell">Deprecation risk</td>
+          <td class="ragas-col"><code>LangchainLLMWrapper</code> deprecated in v1.0</td>
+          <td class="deepeval-col">Scoring direction changes flagged in warnings</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Recommendation -->
+  <div class="recommendation">
+    <h3>Recommendation</h3>
+    <p>
+      Use <strong>RAGAS</strong> when you want a dataset-level benchmark and can tolerate more LLM calls. Use <strong>DeepEval</strong> when you are running LangSmith experiments, need per-question pass/fail in CI/CD, or want simpler LLM prompts that are more reliable with local models. When scores diverge significantly — as they do here on Recall (1.000 vs 0.510) and Faithfulness (0.833 vs 0.580) — investigate the root cause. The divergence itself is diagnostic information about how your system performs under different evaluation lenses, and understanding that divergence is more valuable than trusting either number in isolation.
+    </p>
+  </div>
+
+  <!-- Insight cards -->
+  <div class="section">
+    <h2>Key Insights</h2>
+    <div class="insights">
+      <div class="insight-card">
+        <h3><span class="insight-num">1</span></h3>
+        <p><strong>RAGAS Recall=1.0 does not mean perfect retrieval.</strong> It means every sentence in the reference answer was semantically present somewhere in the 3 retrieved chunks. DeepEval's stricter check (0.51) reveals retrieval only reliably covers all needed specifics half the time. Do not mistake semantic attributability for factual completeness.</p>
+      </div>
+      <div class="insight-card">
+        <h3><span class="insight-num">2</span></h3>
+        <p><strong>Framework methodology determines your score as much as your pipeline.</strong> The faithfulness delta of +0.253 is not noise — it reflects a genuine difference in how RAGAS (claim-level decomposition) and DeepEval (holistic single-call) prompt the judge. Changing your framework can move your score without changing your RAG pipeline at all.</p>
+      </div>
+      <div class="insight-card">
+        <h3><span class="insight-num">3</span></h3>
+        <p><strong>For local models, simpler prompts win.</strong> DeepEval's single-call evaluation is more reliable with qwen2.5:7b than RAGAS's multi-step decomposition chain, which can fail mid-chain and return NaN. If you are constrained to local models, DeepEval's lower prompt complexity translates directly to more stable scores.</p>
+      </div>
+      <div class="insight-card">
+        <h3><span class="insight-num">4</span></h3>
+        <p><strong>Use framework agreement as a trust signal.</strong> When RAGAS and DeepEval agree (Context Precision: 0.889 vs 0.830), you can be confident the metric reflects a real pipeline property. When they diverge (Recall: 1.000 vs 0.510), you need to understand why before trusting either number — the divergence is the finding, not a problem to dismiss.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    Generated 2026-09-01 &nbsp;·&nbsp; Zephyr RAG Eval Lab &nbsp;·&nbsp; Framework Comparison: RAGAS vs DeepEval &nbsp;·&nbsp; Judge: qwen2.5:7b (USE_LOCAL_JUDGE=1)
+  </div>
+
+</div>
+</body>
+</html>

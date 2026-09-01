@@ -108,7 +108,8 @@ Prompts are loaded at import time via `_load_prompt(filename)` defined in `src/c
 
 | Prompt file | Filename constant | Used by | Variable | Function |
 |---|---|---|---|---|
-| `rag_grounding_v1.txt` | `PROMPT_RAG_GROUNDING` | `src/rag_chain.py` | `PROMPT` | `build_rag_chain()` — the generation step of the RAG pipeline |
+| `rag_grounding_v1.txt` | `PROMPT_RAG_GROUNDING` | `src/rag_chain.py` | `PROMPT` | `build_rag_chain()` — Zephyr corpus RAG grounding |
+| `rag_grounding_v2.txt` | `NORTHSTAR_PROMPT_RAG_GROUNDING` | `src/eval_langsmith_northstar.py` | `_RAG_PROMPT` | Northstar RAG grounding — adds exception-awareness and universal-rule inference instructions (fixes NSB-023/024) |
 | `judge_faithfulness_v1.txt` | `PROMPT_JUDGE_FAITHFULNESS` | `src/eval_custom.py` | `JUDGE_PROMPT` | `llm_judge()` — binary PASS/FAIL grading of answer vs context |
 | `judge_correctness_v1.txt` | `PROMPT_JUDGE_CORRECTNESS` | `src/eval_langsmith.py` | `_CORRECTNESS_PROMPT` | `make_correctness_evaluator()` — scores factual accuracy vs reference |
 | `judge_completeness_v1.txt` | `PROMPT_JUDGE_COMPLETENESS` | `src/eval_langsmith.py` | `_COMPLETENESS_PROMPT` | `make_completeness_evaluator()` — scores coverage of reference facts |
@@ -232,36 +233,91 @@ Read the files in this order. Each one is heavily commented with the "why".
 
 ---
 
+## Northstar experiment log
+
+Each run changes one variable at a time. This table captures what was tried, what changed in the scores, and the root-cause explanation — the discipline of treating each experiment as a falsifiable hypothesis rather than a random tweak.
+
+### Run summary
+
+| Run | Chunk | Reranker | Prompt | Query strategy | Ctx Prec | Ctx Rec | Ctx Rel | Faith | Ans Rel | Hall | Notable outcome |
+|-----|-------|----------|--------|----------------|----------|---------|---------|-------|---------|------|-----------------|
+| **Run 1** — chunk400 | 400/80 | None | v1 | Single query | 0.88 | 0.97 | 0.24 | 0.79 | 0.89 | 0.38 | Baseline. High recall but low contextual relevancy — 400-char chunks include too much surrounding noise |
+| **Run 2** — chunk200 | 200/40 | None | v1 | Single query | 0.94 | 0.93 | 0.46 | 0.67 | 0.85 | 0.53 | Smaller chunks sharply improved relevancy (+0.22) and hallucination (+0.15), but faithfulness dropped (-0.12) — some factual answers now span chunk boundaries |
+| **Run 3** — chunk200+rerank | 200/40 | ms-marco | v1 | Single query | 0.83 | 0.88 | 0.40 | 0.70 | 0.78 | 0.40 | Reranker won **0 of 8 metrics** — ms-marco was trained on web-search queries, not banking policy; it deprioritised correct chunks, causing new retrieval failures |
+| **Run 4** — chunk200+fixes | 200/40 | None | v2 | Multi-query (roles) | TBD | TBD | TBD | TBD | TBD | TBD | Prompt v2 (exception + universal-rule awareness) fixed NSB-023/024; multi-query retrieval per role fixed NSB-033 |
+
+### What each failure taught us
+
+| Question | Category | Root cause | Fix applied | Technique |
+|----------|----------|------------|-------------|-----------|
+| NSB-023 — "can a CAD 5,000 international wire use Single Approval?" | Exception reasoning | Retrieval correct; model abstained because context said "requires Dual Approval" but not "Single Approval disallowed" — llama3.1:8b would not infer the negative | Added universal-quantifier instruction to prompt v2: "if context says 'every X requires Y', then X cannot use Z" | Prompt engineering — implication awareness |
+| NSB-024 — "can threshold be CAD 20,000?" | Exception reasoning | Same root cause as NSB-023: threshold cap was in context but model abstained for the specific amount | Same prompt v2 fix | Prompt engineering |
+| NSB-033 — "difference between Viewer and User?" | Comparison / role disambiguation | With k=3, one retrieval query surfaced the User chunk but not the Viewer chunk — their embeddings are too similar; the single query could only surface one | Multi-query retrieval: separate similarity search per mentioned role name, results deduplicated and combined | Retrieval architecture — per-entity query |
+| NSB-003, NSB-026 (Run 3 only) | Factual | Cross-encoder deprioritised correct chunks (ms-marco domain mismatch with banking text) — retrieval that worked without reranking broke with it | Removed reranker; documented as domain-mismatch anti-pattern | Experiment learning — negative result is still a result |
+| NSB-033 (Run 1–3) | Comparison | Embedding space too close for similar role names under single query | Multi-query retrieval (Run 4) | Retrieval architecture |
+
+### Key learnings
+
+| # | Learning | Implication |
+|---|----------|-------------|
+| 1 | **Chunk size trades recall for relevancy.** 400-char chunks maximise recall (facts rarely split across chunks) but pad the context with noise. 200-char chunks are more precise but can split multi-sentence facts. | Neither size is universally better — choose based on whether your bottleneck is retrieval misses or generation noise |
+| 2 | **Reranker domain matters more than model quality.** ms-marco-MiniLM is a strong reranker on web data but actively hurt a banking-policy RAG system. A domain-matched reranker (or no reranker) is better than a mismatched one. | Always validate a reranker on your actual domain before deploying it |
+| 3 | **Small models need explicit reasoning scaffolding in the prompt.** llama3.1:8b would not infer "X cannot use Y" from "X always requires Z" without a worked example in the system prompt. Larger models (GPT-4, Gemini) handle this natively. | Prompt engineering effort scales inversely with model capability; budget for more prompt iteration when using local 8B models |
+| 4 | **Single-query retrieval fails for comparison questions.** When a question asks about two similar entities (Viewer vs User), their chunks compete for the same top-k slots. Multi-query retrieval (one query per entity) guarantees both are represented. | This pattern generalises: any question comparing N things benefits from N retrieval queries |
+
+---
+
 ## Suggested learning path (about a week, an hour a day)
+
+Each day links to a run report or comparison where one exists so you can see real output rather than hypothetical numbers.
 
 1. **Day 1** — Do `SETUP.md`. Copy `.env.example` to `.env` and add your
    `GOOGLE_API_KEY` (free at aistudio.google.com). Run `ingest_zephyr.py` and confirm
    `chroma_db_zephyr/` was written. You now have a searchable knowledge base.
+   *No report — output is the Chroma directory on disk.*
+
 2. **Day 2** — Run `rag_chain.py` with several questions. Then open the run in
    LangSmith and read the retrieve → prompt → generate trace.
-3. **Day 3** — Break it on purpose: set `CHUNK_SIZE=100` in `rag_chain.py`,
+   *No HTML report — trace lives in the LangSmith UI.*
+
+3. **Day 3** — Break it on purpose: set `CHUNK_SIZE=100` in `config.py`,
    re-run `ingest_zephyr.py`, then re-ask. Watch quality drop. This is a controlled experiment.
    Reset to `400` when done.
+   → *See [`reports/Zephyr_reports/eval_comparison_run1_vs_run2.html`](reports/Zephyr_reports/eval_comparison_run1_vs_run2.html) — a real chunk-size experiment (400 vs 200) showing the exact score changes.*
+
 4. **Day 4** — Run `agent.py`. Try a lookup question, a math question, and the
    multi-step retention question. Read the trace to see the tool choices.
+   *No HTML report — trace lives in the LangSmith UI.*
+
 5. **Day 5** — Run `eval_custom.py`. Read every metric's comment block. Set
    `REPEATS=3` and observe variance.
+   *No HTML report — hand-rolled output prints to console.*
+
 6. **Day 6** — Run `eval_ragas.py`. Line its scores up against your hand-rolled
    numbers. Where they disagree, figure out who is right.
+   → *See [`reports/Zephyr_reports/zephyr_framework_comparison_ragas_vs_deepeval.html`](reports/Zephyr_reports/zephyr_framework_comparison_ragas_vs_deepeval.html) — side-by-side RAGAS vs DeepEval on the same 6 Zephyr questions, with agreement analysis and root-cause notes for any divergence.*
+
 7. **Day 7** — Run `eval_deepeval.py`. Compare the same four metrics produced
    by a different framework against your RAGAS scores. If Gemini quota is
    exhausted, set `USE_LOCAL_JUDGE=1` and run with the local model — then
    compare judge quality as a bonus lesson.
+   → *See [`reports/Zephyr_reports/run1_eval_k3_chunk400_llama31_ollama.html`](reports/Zephyr_reports/run1_eval_k3_chunk400_llama31_ollama.html) for per-question DeepEval results, and the framework comparison report for RAGAS vs DeepEval on identical inputs.*
+
 8. **Day 8** — Run `eval_langsmith.py`. This creates the `zephyr-golden-qa`
    dataset in LangSmith programmatically and runs a named experiment. Then run
    `run_golden_eval.py` to trigger LangSmith's configured online evaluator
    (Answer Relevancy) on all 8 questions. Compare experiments side-by-side in
    the LangSmith UI — this is how you track score changes across code iterations.
+   → *See [`reports/Zephyr_reports/run1_eval_k3_chunk400_llama31_ollama.html`](reports/Zephyr_reports/run1_eval_k3_chunk400_llama31_ollama.html) through [`run4_eval_k3_chunk400_qwen25_ollama.html`](reports/Zephyr_reports/run4_eval_k3_chunk400_qwen25_ollama.html) — four runs tracking score evolution across chunk-size and judge-model changes.*
+
 9. **Day 9** — Edit a prompt in `prompts/` (e.g. tighten the grounding
    instruction), re-run `eval_langsmith.py`, and compare scores. You have now
    run a prompt engineering experiment with measurable outcomes.
+   → *See [`reports/Zephyr_reports/eval_comparison_run1_vs_run2.html`](reports/Zephyr_reports/eval_comparison_run1_vs_run2.html) and [`eval_comparison_run3_vs_run4.html`](reports/Zephyr_reports/eval_comparison_run3_vs_run4.html) — both show the delta table format you will produce for your own prompt experiment. The Northstar experiment log above shows a deeper iteration: four runs across chunk size, reranking, prompt version, and retrieval strategy changes.*
+
 10. **Day 10** — Add three of your own questions to `golden_qa.json`, including
     one more out-of-corpus trap. You have now authored an eval suite.
+    *No report — the eval scripts will produce output on your new questions automatically.*
 
 ---
 
