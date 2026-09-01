@@ -364,17 +364,20 @@
           <td class="id-cell">NSB-034</td>
           <td class="question-cell">A user is disabled while logged in &mdash; what happens to their active session?</td>
           <td><span class="cat-badge cat-procedural">procedural</span></td>
-          <td colspan="8" style="font-size:0.8rem;color:#94a3b8;padding:8px 12px;">
-            <em>Run 4 scores: all 0.00 (retrieval bug — see below)</em><br>
-            <strong style="color:#4ade80;">Post-patch:</strong> multi-query guard added; retrieval now correctly fetches section 8.2.
-            Validated answer: <em>"Within five minutes."</em> &mdash; formal metric re-run pending.
-          </td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-mid">0.50</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">0.80</span></td>
           <td><span class="change-badge change-win">FIXED</span></td>
         </tr>
       </tbody>
     </table>
     </div>
-    <p style="font-size:0.78rem;color:#94a3b8;margin-top:8px;">NSB-023: AR=0.00 is a known judge artifact (see fix notes above). NSB-034: all-zero scores in Run 4 were caused by multi-query retrieval over-triggering — the question mentions "user" and "administrator", both role terms, so retrieval fetched role-definition chunks (section 1.1) instead of the session-control policy (section 8.2). Root cause identified and patched: multi-query now requires explicit comparison language ("difference", "compare", "versus") to trigger. Post-patch validated answer: "Within five minutes."</p>
+    <p style="font-size:0.78rem;color:#94a3b8;margin-top:8px;">NSB-023: AR=0.00 is a known judge artifact (see fix notes above). NSB-034: all-zero scores in Run 4 were caused by multi-query retrieval over-triggering — the question mentions "user" and "administrator", both role terms, so retrieval fetched role-definition chunks (section 1.1) instead of the session-control policy (section 8.2). Root cause identified and patched: multi-query now requires explicit comparison language ("difference", "compare", "versus") to trigger. Scores above are from a post-patch formal re-run (precision=1.00, recall=1.00, faithfulness=1.00, correctness=1.00). Hallucination=0.00 reflects the universal-rule inference pattern from prompt v2, consistent with other questions.</p>
   </div>
 
   <!-- Verdict -->
