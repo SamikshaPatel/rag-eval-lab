@@ -1,5 +1,5 @@
 """
-STEP 7 (EVALUATION) — PART 2: RAGAS, THE INDUSTRY-STANDARD LIBRARY
+STAGE 3 (EVALUATION) — PART 2: RAGAS, THE INDUSTRY-STANDARD LIBRARY
 =================================================================
 Now that you have hand-built the metrics, here is the library everyone uses.
 RAGAS computes the "RAG triad" plus more, using LLM-as-judge internally:

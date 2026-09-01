@@ -12,7 +12,7 @@ test record (TR) maps to one RUNBOOK step and states:
 
 ---
 
-## TR-01 — Build the Vector Store (RUNBOOK Step 5)
+## TR-01 — Build the Vector Store (RUNBOOK Stage 1)
 
 **Command:**
 ```bash
@@ -43,7 +43,7 @@ Run `ollama list` to confirm both models are present.
 
 ---
 
-## TR-02 — RAG Pipeline: In-Corpus Questions (RUNBOOK Step 6)
+## TR-02 — RAG Pipeline: In-Corpus Questions (RUNBOOK Stage 2)
 
 **Commands:**
 ```bash
@@ -71,7 +71,7 @@ python3 src/rag_chain.py "What is the API rate limit on the Pro plan?"
 
 ---
 
-## TR-03 — RAG Pipeline: Out-of-Corpus (Hallucination Test) (RUNBOOK Step 6)
+## TR-03 — RAG Pipeline: Out-of-Corpus (Hallucination Test) (RUNBOOK Stage 2)
 
 **Command:**
 ```bash
@@ -101,7 +101,7 @@ the prompt is broken and every eval metric becomes meaningless.
 
 ---
 
-## TR-04 — RAG Pipeline: Known Retrieval Gap (RUNBOOK Step 6)
+## TR-04 — RAG Pipeline: Known Retrieval Gap (RUNBOOK Stage 2)
 
 **Command:**
 ```bash
@@ -140,7 +140,7 @@ the negative with the chunks it receives.
 
 ---
 
-## TR-05 — Agent Tool Routing (RUNBOOK Step 7)
+## TR-05 — Agent Tool Routing (RUNBOOK Stage 3)
 
 **Commands:**
 ```bash

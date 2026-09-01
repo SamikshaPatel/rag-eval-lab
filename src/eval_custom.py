@@ -1,5 +1,5 @@
 """
-STEP 7 (EVALUATION) — PART 1: BUILD YOUR OWN EVAL HARNESS
+STAGE 3 (EVALUATION) — PART 1: BUILD YOUR OWN EVAL HARNESS
 ========================================================
 Before importing an eval library, build one. If you understand what these
 metrics compute, you will never be fooled by a green dashboard.

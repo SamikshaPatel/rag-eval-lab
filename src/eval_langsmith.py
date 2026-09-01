@@ -1,5 +1,5 @@
 """
-STEP 7 (EVALUATION) — PART 4: LANGSMITH EXPERIMENTS
+STAGE 3 (EVALUATION) — PART 4: LANGSMITH EXPERIMENTS
 =====================================================
 Runs all golden-dataset questions through the RAG pipeline as a LangSmith
 experiment so scores appear in the LangSmith UI and can be compared across

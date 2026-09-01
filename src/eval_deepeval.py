@@ -1,5 +1,5 @@
 """
-STEP 7 (EVALUATION) — PART 3: DEEPEVAL
+STAGE 3 (EVALUATION) — PART 3: DEEPEVAL
 =======================================
 DeepEval is a pytest-style LLM eval framework. Each question becomes an
 LLMTestCase; metrics score it independently. Compared with RAGAS it makes

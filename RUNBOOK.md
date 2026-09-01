@@ -153,7 +153,7 @@ echo $LANGSMITH_API_KEY     # should print your key (not blank)
 
 ---
 
-## Step 5 — Build the Vector Store
+## Stage 1 — Build the Vector Store
 
 **Purpose:** Chunk the handbook into searchable pieces, embed each chunk, and
 save to ChromaDB on disk. This is the "index" that all retrieval steps search
@@ -195,7 +195,7 @@ this demonstrates chunk size as a tunable variable. Reset to 400 when done.
 
 ---
 
-## Step 6 — Test the RAG Pipeline
+## Stage 2 — Test the RAG Pipeline
 
 **Purpose:** Manually verify the end-to-end RAG pipeline before running
 automated evaluations. Builds intuition for what retrieval + generation looks
@@ -243,7 +243,7 @@ This trace view is the most important debugging tool in RAG systems.
 
 ---
 
-## Step 7 — Test the Agent
+## Stage 3 — Test the Agent
 
 **Purpose:** Verify the LangGraph ReAct agent correctly routes questions to the
 right tool, including multi-step reasoning that combines retrieval and

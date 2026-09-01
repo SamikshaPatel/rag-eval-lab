@@ -1,13 +1,13 @@
 # RAG + Agent + Eval Lab — a fully local learning project
 
-One tiny project that combines **Step 5 (RAG)**, **Step 6 (Agents & tool use)**,
-and **Step 7 (Evaluation)** from your AI-testing plan. RAG and agents run
+One tiny project that combines **Stage 1 (RAG)**, **Stage 2 (Agents & tool use)**,
+and **Stage 3 (Evaluation)** from your AI-testing plan. RAG and agents run
 entirely on your machine. Evaluation uses **Gemini 3.6 Flash** as the LLM judge
 (free API key required) and an optional free LangSmith account for tracing and eval UI.
 
 The thing you are really learning: **how to test a system that gives a
 different answer every time you run it.** That is the discipline that separates
-AI QA from traditional QA, and evaluation (step 7) is where your existing
+AI QA from traditional QA, and evaluation (Stage 3) is where your existing
 testing instincts transfer directly.
 
 ---
@@ -158,7 +158,7 @@ Three different fallback mechanisms exist in this project. The table below shows
 
 Read the files in this order. Each one is heavily commented with the "why".
 
-### Step 5 — Retrieval-Augmented Generation
+### Stage 1 — Retrieval-Augmented Generation
 
 | Concept | File | What you learn |
 |---|---|---|
@@ -170,7 +170,7 @@ Read the files in this order. Each one is heavily commented with the "why".
 | **Prompt grounding** | `prompts/rag_grounding_v1.txt` + `src/rag_chain.py` | The "use only the context / else say I don't know" instruction is your main anti-hallucination lever |
 | **LCEL pipeline** | `src/rag_chain.py` | RAG is a data-flow graph; reading it shows every place a bug can hide |
 
-### Step 6 — Agents & tool use
+### Stage 2 — Agents & tool use
 
 | Concept | File | What you learn |
 |---|---|---|
@@ -179,7 +179,7 @@ Read the files in this order. Each one is heavily commented with the "why".
 | **Multi-step reasoning** | `src/agent.py` | "90 extra days of retention → cost?" needs retrieve **then** calculate |
 | **New failure modes** | `src/agent.py` | Wrong tool, wrong arguments, loops — why agents need more testing than chains |
 
-### Step 7 — Evaluation (your home turf)
+### Stage 3 — Evaluation (your home turf)
 
 #### Foundations
 
