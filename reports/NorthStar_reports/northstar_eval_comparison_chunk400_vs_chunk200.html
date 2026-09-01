@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Northstar RAG Eval — chunk400 vs chunk200 Comparison</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f4f6f9; color: #1a1a2e; padding: 32px 24px; }
+    .container { max-width: 1200px; margin: 0 auto; }
+
+    /* Header */
+    .header { background: linear-gradient(135deg, #0c2340 0%, #1a3a5c 60%, #0f4c81 100%); color: #fff; border-radius: 12px; padding: 32px 36px; margin-bottom: 28px; }
+    .header h1 { font-size: 1.6rem; font-weight: 700; margin-bottom: 6px; }
+    .header .subtitle { font-size: 0.9rem; opacity: 0.7; margin-bottom: 18px; }
+    .exp-ids { display: flex; gap: 12px; flex-wrap: wrap; }
+    .exp-id { display: inline-block; border-radius: 6px; padding: 4px 12px; font-family: monospace; font-size: 0.8rem; }
+    .exp-id-r1 { background: rgba(96,165,250,0.2); border: 1px solid rgba(96,165,250,0.4); }
+    .exp-id-r2 { background: rgba(251,191,36,0.2); border: 1px solid rgba(251,191,36,0.4); }
+
+    h2 { font-size: 1.05rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #0f4c81; margin-bottom: 14px; padding-bottom: 6px; border-bottom: 2px solid #e2e8f0; }
+
+    /* Config comparison */
+    .config-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 28px; }
+    @media (max-width: 640px) { .config-compare { grid-template-columns: 1fr; } }
+    .config-panel { background: #fff; border-radius: 10px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
+    .config-panel h3 { font-size: 0.85rem; font-weight: 700; margin-bottom: 14px; padding-bottom: 6px; border-bottom: 2px solid; }
+    .config-panel.r1 h3 { color: #1d4ed8; border-color: #bfdbfe; }
+    .config-panel.r2 h3 { color: #92400e; border-color: #fde68a; }
+    .config-row { display: flex; justify-content: space-between; font-size: 0.85rem; padding: 5px 0; border-bottom: 1px solid #f1f5f9; }
+    .config-row:last-child { border-bottom: none; }
+    .config-row .key { color: #64748b; }
+    .config-row .val { font-weight: 600; font-family: monospace; }
+    .config-row.changed .val { color: #d97706; background: #fef3c7; padding: 1px 6px; border-radius: 4px; }
+
+    /* Score badges */
+    .score { display: inline-block; width: 50px; text-align: center; font-weight: 700; font-size: 0.85rem; border-radius: 6px; padding: 3px 0; }
+    .score-high { background: #d1fae5; color: #065f46; }
+    .score-mid  { background: #fef3c7; color: #92400e; }
+    .score-low  { background: #fee2e2; color: #991b1b; }
+    .score-na   { background: #f1f5f9; color: #64748b; }
+
+    .delta { display: inline-block; font-weight: 700; font-size: 0.8rem; border-radius: 4px; padding: 2px 6px; min-width: 54px; text-align: center; }
+    .delta-pos  { background: #d1fae5; color: #065f46; }
+    .delta-neg  { background: #fee2e2; color: #991b1b; }
+    .delta-neu  { background: #f1f5f9; color: #64748b; }
+
+    .winner { display: inline-block; font-size: 0.72rem; font-weight: 700; border-radius: 12px; padding: 2px 8px; white-space: nowrap; }
+    .winner-r1  { background: #dbeafe; color: #1d4ed8; }
+    .winner-r2  { background: #fef3c7; color: #92400e; }
+    .winner-tie { background: #f1f5f9; color: #64748b; }
+
+    /* Category badges */
+    .cat-badge { display: inline-block; border-radius: 4px; padding: 2px 8px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+    .cat-factual    { background: #dbeafe; color: #1d4ed8; }
+    .cat-procedural { background: #d1fae5; color: #065f46; }
+    .cat-comparison { background: #fef3c7; color: #92400e; }
+    .cat-multi_hop  { background: #ede9fe; color: #5b21b6; }
+    .cat-exception  { background: #fee2e2; color: #991b1b; }
+
+    .change-badge { display: inline-block; border-radius: 4px; padding: 2px 8px; font-size: 0.72rem; font-weight: 700; }
+    .change-fix  { background: #d1fae5; color: #065f46; }
+    .change-reg  { background: #fee2e2; color: #991b1b; }
+    .change-same { background: #f1f5f9; color: #64748b; }
+    .change-mixed { background: #fef3c7; color: #92400e; }
+
+    /* Tables */
+    .section { margin-bottom: 32px; }
+    .table-scroll { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.07); font-size: 0.85rem; }
+    thead { background: #0c2340; color: #fff; }
+    thead th { padding: 11px 10px; text-align: center; font-weight: 600; font-size: 0.75rem; letter-spacing: 0.04em; text-transform: uppercase; }
+    thead th:first-child { text-align: left; padding-left: 14px; }
+    thead .r1-col  { background: #1e40af; }
+    thead .r2-col  { background: #92400e; }
+    thead .delta-col  { background: #374151; }
+    thead .winner-col { background: #1f2937; }
+    tbody tr { border-bottom: 1px solid #f1f5f9; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: #f8fafc; }
+    td { padding: 10px; vertical-align: middle; text-align: center; }
+    td:first-child { text-align: left; padding-left: 14px; font-weight: 500; }
+    .avg-row td { background: #eff6ff; font-weight: 700; border-top: 2px solid #bfdbfe; }
+
+    /* Notable changes table */
+    .id-cell { font-family: monospace; font-size: 0.8rem; color: #64748b; white-space: nowrap; }
+    .question-cell { font-size: 0.83rem; max-width: 280px; }
+
+    /* Verdict */
+    .verdict-box { background: #fff; border-radius: 12px; padding: 24px 28px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); margin-bottom: 32px; border-left: 5px solid #0f4c81; }
+    .verdict-box h3 { font-size: 1rem; font-weight: 700; color: #0f4c81; margin-bottom: 12px; }
+    .verdict-box p { font-size: 0.88rem; color: #374151; line-height: 1.7; margin-bottom: 8px; }
+    .verdict-box p:last-child { margin-bottom: 0; }
+    .verdict-box strong { color: #1a1a2e; }
+
+    /* Insights grid */
+    .insights { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 32px; }
+    @media (max-width: 720px) { .insights { grid-template-columns: 1fr; } }
+    .insight-card { background: #fff; border-radius: 10px; padding: 20px 22px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
+    .insight-card h3 { font-size: 0.85rem; font-weight: 700; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+    .insight-card ul { padding-left: 18px; }
+    .insight-card li { font-size: 0.85rem; color: #374151; margin-bottom: 6px; line-height: 1.5; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+    .dot-green { background: #10b981; }
+    .dot-yellow { background: #f59e0b; }
+    .dot-red { background: #ef4444; }
+
+    /* Footer */
+    .footer { text-align: center; font-size: 0.78rem; color: #94a3b8; padding-top: 16px; border-top: 1px solid #e2e8f0; }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <h1>Northstar Digital Bank — Chunk Size Comparison</h1>
+    <div class="subtitle">chunk=400/overlap=80 &nbsp;vs&nbsp; chunk=200/overlap=40 &nbsp;&mdash;&nbsp; 36 in-corpus, 8 OOD &nbsp;&mdash;&nbsp; judge: qwen2.5:7b</div>
+    <div class="exp-ids">
+      <span class="exp-id exp-id-r1">chunk400 &nbsp;northstar-k3-chunk400o80-llama3_1-8b-judge-ollama-2589578c</span>
+      <span class="exp-id exp-id-r2">chunk200 &nbsp;northstar-k3-chunk200o40-llama3_1-8b-judge-ollama-5811c36c</span>
+    </div>
+  </div>
+
+  <!-- Config -->
+  <div class="section">
+    <h2>Configuration</h2>
+    <div class="config-compare">
+      <div class="config-panel r1">
+        <h3>Baseline — chunk400</h3>
+        <div class="config-row"><span class="key">Chunk Size</span><span class="val">400 chars</span></div>
+        <div class="config-row"><span class="key">Chunk Overlap</span><span class="val">80 chars</span></div>
+        <div class="config-row"><span class="key">Chunks in DB</span><span class="val">42</span></div>
+        <div class="config-row"><span class="key">Retrieval K</span><span class="val">3</span></div>
+        <div class="config-row"><span class="key">Chat Model</span><span class="val">llama3.1:8b</span></div>
+        <div class="config-row"><span class="key">Judge Model</span><span class="val">qwen2.5:7b</span></div>
+        <div class="config-row"><span class="key">Run Date</span><span class="val">2026-08-31</span></div>
+      </div>
+      <div class="config-panel r2">
+        <h3>Experiment — chunk200</h3>
+        <div class="config-row changed"><span class="key">Chunk Size</span><span class="val">200 chars</span></div>
+        <div class="config-row changed"><span class="key">Chunk Overlap</span><span class="val">40 chars</span></div>
+        <div class="config-row changed"><span class="key">Chunks in DB</span><span class="val">102</span></div>
+        <div class="config-row"><span class="key">Retrieval K</span><span class="val">3</span></div>
+        <div class="config-row"><span class="key">Chat Model</span><span class="val">llama3.1:8b</span></div>
+        <div class="config-row"><span class="key">Judge Model</span><span class="val">qwen2.5:7b</span></div>
+        <div class="config-row"><span class="key">Run Date</span><span class="val">2026-08-31</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Overall Metric Comparison -->
+  <div class="section">
+    <h2>Overall Metrics — 36 In-Corpus Questions</h2>
+    <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Metric</th>
+          <th class="r1-col">chunk400</th>
+          <th class="r2-col">chunk200</th>
+          <th class="delta-col">Delta</th>
+          <th class="winner-col">Winner</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Contextual Precision</td>
+          <td><span class="score score-high">0.88</span></td>
+          <td><span class="score score-high">0.94</span></td>
+          <td><span class="delta delta-pos">+0.06</span></td>
+          <td><span class="winner winner-r2">chunk200</span></td>
+        </tr>
+        <tr>
+          <td>Contextual Recall</td>
+          <td><span class="score score-high">0.97</span></td>
+          <td><span class="score score-high">0.93</span></td>
+          <td><span class="delta delta-neg">&minus;0.04</span></td>
+          <td><span class="winner winner-r1">chunk400</span></td>
+        </tr>
+        <tr>
+          <td>Contextual Relevancy</td>
+          <td><span class="score score-low">0.24</span></td>
+          <td><span class="score score-mid">0.46</span></td>
+          <td><span class="delta delta-pos">+0.22</span></td>
+          <td><span class="winner winner-r2">chunk200 ✦</span></td>
+        </tr>
+        <tr>
+          <td>Faithfulness</td>
+          <td><span class="score score-high">0.79</span></td>
+          <td><span class="score score-mid">0.67</span></td>
+          <td><span class="delta delta-neg">&minus;0.12</span></td>
+          <td><span class="winner winner-r1">chunk400 ✦</span></td>
+        </tr>
+        <tr>
+          <td>Answer Relevancy</td>
+          <td><span class="score score-high">0.89</span></td>
+          <td><span class="score score-high">0.85</span></td>
+          <td><span class="delta delta-neg">&minus;0.04</span></td>
+          <td><span class="winner winner-r1">chunk400</span></td>
+        </tr>
+        <tr>
+          <td>Hallucination</td>
+          <td><span class="score score-low">0.38</span></td>
+          <td><span class="score score-mid">0.53</span></td>
+          <td><span class="delta delta-pos">+0.15</span></td>
+          <td><span class="winner winner-r2">chunk200</span></td>
+        </tr>
+        <tr>
+          <td>Correctness</td>
+          <td><span class="score score-high">0.83</span></td>
+          <td><span class="score score-high">0.82</span></td>
+          <td><span class="delta delta-neu">&minus;0.01</span></td>
+          <td><span class="winner winner-tie">Tie</span></td>
+        </tr>
+        <tr>
+          <td>Completeness</td>
+          <td><span class="score score-high">0.81</span></td>
+          <td><span class="score score-high">0.79</span></td>
+          <td><span class="delta delta-neu">&minus;0.02</span></td>
+          <td><span class="winner winner-tie">Tie</span></td>
+        </tr>
+        <tr>
+          <td>Abstention (OOD)</td>
+          <td><span class="score score-high">8/8</span></td>
+          <td><span class="score score-high">8/8</span></td>
+          <td><span class="delta delta-neu">0.00</span></td>
+          <td><span class="winner winner-tie">Tie</span></td>
+        </tr>
+        <tr class="avg-row">
+          <td>chunk200 wins</td>
+          <td colspan="4" style="text-align:left; padding-left:10px; color:#374151; font-size:0.85rem;">
+            3 metrics (Ctx Precision, Ctx Relevancy, Hallucination) &nbsp;|&nbsp;
+            chunk400 wins: 3 metrics (Ctx Recall, Faithfulness, Ans Relevancy) &nbsp;|&nbsp;
+            Ties: 3
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+    <p style="font-size:0.78rem;color:#94a3b8;margin-top:8px;">✦ = largest magnitude change (&gt;0.10)</p>
+  </div>
+
+  <!-- Category Breakdown Comparison -->
+  <div class="section">
+    <h2>Category Breakdown Comparison</h2>
+    <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Category</th>
+          <th>Qs</th>
+          <th class="r1-col">Ctx Prec<br>400</th>
+          <th class="r2-col">Ctx Prec<br>200</th>
+          <th class="r1-col">Ctx Rel<br>400</th>
+          <th class="r2-col">Ctx Rel<br>200</th>
+          <th class="r1-col">Faith<br>400</th>
+          <th class="r2-col">Faith<br>200</th>
+          <th class="r1-col">Corr<br>400</th>
+          <th class="r2-col">Corr<br>200</th>
+          <th class="r1-col">Comp<br>400</th>
+          <th class="r2-col">Comp<br>200</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="cat-badge cat-factual">Factual</span></td>
+          <td>14</td>
+          <td><span class="score score-high">0.81</span></td>
+          <td><span class="score score-high">0.93</span></td>
+          <td><span class="score score-low">0.22</span></td>
+          <td><span class="score score-mid">0.43</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">0.71</span></td>
+          <td><span class="score score-high">0.94</span></td>
+          <td><span class="score score-high">0.87</span></td>
+          <td><span class="score score-high">0.94</span></td>
+          <td><span class="score score-high">0.88</span></td>
+        </tr>
+        <tr>
+          <td><span class="cat-badge cat-procedural">Procedural</span></td>
+          <td>7</td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.23</span></td>
+          <td><span class="score score-mid">0.47</span></td>
+          <td><span class="score score-high">0.86</span></td>
+          <td><span class="score score-high">0.71</span></td>
+          <td><span class="score score-high">0.94</span></td>
+          <td><span class="score score-high">0.83</span></td>
+          <td><span class="score score-high">0.94</span></td>
+          <td><span class="score score-high">0.80</span></td>
+        </tr>
+        <tr>
+          <td><span class="cat-badge cat-comparison">Comparison</span></td>
+          <td>4</td>
+          <td><span class="score score-high">0.71</span></td>
+          <td><span class="score score-high">0.71</span></td>
+          <td><span class="score score-low">0.32</span></td>
+          <td><span class="score score-mid">0.46</span></td>
+          <td><span class="score score-mid">0.67</span></td>
+          <td><span class="score score-mid">0.54</span></td>
+          <td><span class="score score-mid">0.65</span></td>
+          <td><span class="score score-mid">0.65</span></td>
+          <td><span class="score score-mid">0.65</span></td>
+          <td><span class="score score-mid">0.60</span></td>
+        </tr>
+        <tr>
+          <td><span class="cat-badge cat-multi_hop">Multi-Hop</span></td>
+          <td>8</td>
+          <td><span class="score score-high">0.95</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.27</span></td>
+          <td><span class="score score-mid">0.57</span></td>
+          <td><span class="score score-mid">0.61</span></td>
+          <td><span class="score score-high">0.75</span></td>
+          <td><span class="score score-high">0.81</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">0.73</span></td>
+          <td><span class="score score-high">0.91</span></td>
+        </tr>
+        <tr>
+          <td><span class="cat-badge cat-exception">Exception</span></td>
+          <td>3</td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.12</span></td>
+          <td><span class="score score-low">0.26</span></td>
+          <td><span class="score score-low">0.33</span></td>
+          <td><span class="score score-low">0.33</span></td>
+          <td><span class="score score-low">0.33</span></td>
+          <td><span class="score score-low">0.33</span></td>
+          <td><span class="score score-low">0.30</span></td>
+          <td><span class="score score-low">0.27</span></td>
+        </tr>
+        <tr class="avg-row">
+          <td><strong>Overall</strong></td>
+          <td>36</td>
+          <td><span class="score score-high">0.88</span></td>
+          <td><span class="score score-high">0.94</span></td>
+          <td><span class="score score-low">0.24</span></td>
+          <td><span class="score score-mid">0.46</span></td>
+          <td><span class="score score-high">0.79</span></td>
+          <td><span class="score score-mid">0.67</span></td>
+          <td><span class="score score-high">0.83</span></td>
+          <td><span class="score score-high">0.82</span></td>
+          <td><span class="score score-high">0.81</span></td>
+          <td><span class="score score-high">0.79</span></td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+  <!-- Notable Per-Question Changes -->
+  <div class="section">
+    <h2>Notable Per-Question Changes</h2>
+    <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th style="text-align:left">Question</th>
+          <th>Category</th>
+          <th class="r1-col">Faith<br>400</th>
+          <th class="r2-col">Faith<br>200</th>
+          <th class="r1-col">Corr<br>400</th>
+          <th class="r2-col">Corr<br>200</th>
+          <th class="r1-col">Ctx Rel<br>400</th>
+          <th class="r2-col">Ctx Rel<br>200</th>
+          <th>Change</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- FIXED -->
+        <tr>
+          <td class="id-cell">NSB-022</td>
+          <td class="question-cell">Can the same employee who created a CAD 8,000 payment under Dual Approval also approve it?</td>
+          <td><span class="cat-badge cat-multi_hop">multi_hop</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.27</span></td>
+          <td><span class="score score-high">0.83</span></td>
+          <td><span class="change-badge change-fix">FIXED</span></td>
+        </tr>
+        <tr>
+          <td class="id-cell">NSB-031</td>
+          <td class="question-cell">Does a temporary EFT limit increase permanently change the standard limit?</td>
+          <td><span class="cat-badge cat-multi_hop">multi_hop</span></td>
+          <td><span class="score score-high">0.70</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">0.93</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.27</span></td>
+          <td><span class="score score-high">0.86</span></td>
+          <td><span class="change-badge change-fix">IMPROVED</span></td>
+        </tr>
+        <tr>
+          <td class="id-cell">NSB-015</td>
+          <td class="question-cell">What happens if available funds are insufficient when a payment reaches release time?</td>
+          <td><span class="cat-badge cat-procedural">procedural</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-mid">0.57</span></td>
+          <td><span class="score score-high">0.80</span></td>
+          <td><span class="score score-low">0.23</span></td>
+          <td><span class="score score-mid">0.62</span></td>
+          <td><span class="change-badge change-fix">FIXED</span></td>
+        </tr>
+        <!-- REGRESSIONS -->
+        <tr>
+          <td class="id-cell">NSB-001</td>
+          <td class="question-cell">What is the standard daily limit for Interac Business Transfer?</td>
+          <td><span class="cat-badge cat-factual">factual</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.22</span></td>
+          <td><span class="score score-low">0.33</span></td>
+          <td><span class="change-badge change-reg">REGRESSED</span></td>
+        </tr>
+        <tr>
+          <td class="id-cell">NSB-003</td>
+          <td class="question-cell">What is the standard daily limit for domestic wires?</td>
+          <td><span class="cat-badge cat-factual">factual</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.22</span></td>
+          <td><span class="score score-low">0.17</span></td>
+          <td><span class="change-badge change-reg">REGRESSED</span></td>
+        </tr>
+        <tr>
+          <td class="id-cell">NSB-005</td>
+          <td class="question-cell">How long does a user activation email remain valid?</td>
+          <td><span class="cat-badge cat-factual">factual</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.22</span></td>
+          <td><span class="score score-mid">0.67</span></td>
+          <td><span class="change-badge change-reg">REGRESSED</span></td>
+        </tr>
+        <tr>
+          <td class="id-cell">NSB-012</td>
+          <td class="question-cell">What happens to an EFT file submitted before 6:00 PM Eastern Time?</td>
+          <td><span class="cat-badge cat-procedural">procedural</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-mid">0.50</span></td>
+          <td><span class="score score-low">0.23</span></td>
+          <td><span class="score score-mid">0.60</span></td>
+          <td><span class="change-badge change-reg">REGRESSED</span></td>
+        </tr>
+        <tr>
+          <td class="id-cell">NSB-013</td>
+          <td class="question-cell">What happens if an EFT file is submitted after 6:00 PM Eastern Time?</td>
+          <td><span class="cat-badge cat-procedural">procedural</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-mid">0.50</span></td>
+          <td><span class="score score-low">0.23</span></td>
+          <td><span class="score score-low">0.25</span></td>
+          <td><span class="change-badge change-reg">REGRESSED</span></td>
+        </tr>
+        <tr>
+          <td class="id-cell">NSB-035</td>
+          <td class="question-cell">What are the supported roles for administration and access?</td>
+          <td><span class="cat-badge cat-factual">factual</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">0.70</span></td>
+          <td><span class="score score-low">0.22</span></td>
+          <td><span class="score score-low">0.29</span></td>
+          <td><span class="change-badge change-reg">REGRESSED</span></td>
+        </tr>
+        <!-- STILL FAILING -->
+        <tr>
+          <td class="id-cell">NSB-023</td>
+          <td class="question-cell">If an international wire is only CAD 5,000, can it use Single Approval?</td>
+          <td><span class="cat-badge cat-exception">exception</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-low">0.12</span></td>
+          <td><span class="score score-low">0.14</span></td>
+          <td><span class="change-badge change-same">STILL FAILING</span></td>
+        </tr>
+        <tr>
+          <td class="id-cell">NSB-024</td>
+          <td class="question-cell">Can a business configure a threshold of CAD 20,000 under the standard threshold policy?</td>
+          <td><span class="cat-badge cat-exception">exception</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-low">0.12</span></td>
+          <td><span class="score score-mid">0.40</span></td>
+          <td><span class="change-badge change-same">STILL FAILING</span></td>
+        </tr>
+        <tr>
+          <td class="id-cell">NSB-033</td>
+          <td class="question-cell">What is the difference between a Viewer and a User?</td>
+          <td><span class="cat-badge cat-comparison">comparison</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-low">0.32</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="change-badge change-same">STILL FAILING</span></td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+  <!-- Verdict -->
+  <div class="verdict-box">
+    <h3>Verdict</h3>
+    <p><strong>chunk200 is the clear winner for retrieval focus:</strong> Contextual Relevancy jumped from 0.24 → 0.46 (+0.22), the single largest improvement. Smaller chunks surface more targeted content and fewer off-topic sentences. Hallucination also improved (0.38 → 0.53), and Contextual Precision increased slightly (0.88 → 0.94).</p>
+    <p><strong>chunk400 is better for faithfulness-sensitive answers:</strong> Faithfulness dropped from 0.79 → 0.67 (−0.12). Several simple factual questions (NSB-001, NSB-003, NSB-005, NSB-012, NSB-013, NSB-035) regressed from faith=1.00 to faith=0.00 in chunk200. These answers require synthesizing a figure plus its unit or context (e.g. "CAD 25,000 per business day") that spans slightly more than 200 characters — the model could not ground its response with truncated chunks.</p>
+    <p><strong>Multi-hop category improved significantly with chunk200:</strong> Faithfulness 0.61 → 0.75, Correctness 0.81 → 1.00, Completeness 0.73 → 0.91. The critical NSB-022 failure (Dual Approval / same employee) was fully resolved — chunk200 retrieved the exact approval-policy chunk with high relevancy (0.83), enabling a faithful and correct answer.</p>
+    <p><strong>Persistent failures unaffected by chunk size:</strong> NSB-023, NSB-024 (exception policy — "always Dual Approval", "cannot exceed CAD 10,000") and NSB-033 (Viewer vs User role distinction) fail under both configurations. These require either metadata-filtered retrieval targeting §1.1 and §3.2, or a prompt that explicitly instructs the model to apply negative constraints.</p>
+  </div>
+
+  <!-- Insights -->
+  <div class="section">
+    <h2>Analysis</h2>
+    <div class="insights">
+      <div class="insight-card">
+        <h3><span class="dot dot-green"></span> chunk200 Wins</h3>
+        <ul>
+          <li><strong>Ctx Relevancy +0.22</strong> — biggest gain across all experiments. Smaller chunks reduce boilerplate noise around answers.</li>
+          <li><strong>Hallucination +0.15</strong> — focused chunks make it easier for the model to stay grounded in retrieved content.</li>
+          <li><strong>Multi-hop correctness 0.81 → 1.00</strong> — NSB-022 and NSB-015 both fixed; smaller chunks contain the specific rule without adjacent clutter.</li>
+          <li><strong>Ctx Precision +0.06</strong> — retrieving 3 small targeted chunks is more precise than 3 large mixed chunks.</li>
+        </ul>
+      </div>
+      <div class="insight-card">
+        <h3><span class="dot dot-red"></span> chunk200 Regressions</h3>
+        <ul>
+          <li><strong>Faithfulness −0.12</strong> — answers requiring context that spans &gt;200 chars lose grounding. The model generates correctly but the judge cannot verify claims against partial chunks.</li>
+          <li><strong>5 factual questions regressed</strong> (faith 1.00 → 0.00): limit values and procedural steps that need surrounding numeric context are split across chunk boundaries.</li>
+          <li><strong>EFT cutoff questions (NSB-012/013)</strong> — settlement timing requires combining the cutoff time, the processing cycle, and the T+2 rule; chunk200 splits these into separate chunks that k=3 may not all retrieve.</li>
+        </ul>
+      </div>
+      <div class="insight-card">
+        <h3><span class="dot dot-yellow"></span> Tradeoff Summary</h3>
+        <ul>
+          <li>chunk200: better for <em>focused lookups and multi-hop reasoning</em> where the answer fits within a single compact fact.</li>
+          <li>chunk400: better for <em>answers that require surrounding context</em> — unit + value + condition together in one chunk.</li>
+          <li>The faithfulness/relevancy tradeoff is fundamental to fixed-size chunking. A semantic chunker (split on sentence/section boundaries) would preserve both properties.</li>
+          <li>k=3 may be too low for chunk200 — increasing to k=5 could recover the missing context for factual regressions without losing the relevancy gains.</li>
+        </ul>
+      </div>
+      <div class="insight-card">
+        <h3><span class="dot dot-red"></span> Persistent Failures (chunk-size independent)</h3>
+        <ul>
+          <li><strong>NSB-023/024 (Exception)</strong> — implicit negative constraints ("always requires", "cannot exceed") not captured by embedding similarity. The model retrieves correct chunks but generates the wrong answer.</li>
+          <li><strong>NSB-033 (Comparison)</strong> — Viewer vs User roles share similar embedding space; retrieval fails for both chunk sizes (prec=0.00, rec=0.00).</li>
+          <li>These require a non-retrieval fix: metadata-filtered retrieval (force §1.1 for role questions, §3.2 for approval questions) or a negative-constraint prompt.</li>
+          <li><strong>Recommendation:</strong> Try k=5 with chunk200 next to recover factual recall, then address the 3 persistent failures via retrieval routing.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    Northstar Digital Bank RAG Evaluation &mdash; chunk400 vs chunk200 comparison &mdash; 2026-08-31 &mdash; judge: qwen2.5:7b (Ollama)
+  </div>
+
+</div>
+</body>
+</html>

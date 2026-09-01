@@ -99,6 +99,7 @@ from config import (
     JUDGE_MODEL, LOCAL_JUDGE_MODEL,
     CHAT_MODEL, EMBED_MODEL, NORTHSTAR_CHUNK_SIZE, NORTHSTAR_CHUNK_OVERLAP,
     RETRIEVAL_K, TEMPERATURE,
+    RERANKER_MODEL, RERANKER_FETCH_K,
     FAITHFULNESS_THRESHOLD, RELEVANCY_THRESHOLD,
     CONTEXTUAL_PRECISION_THRESHOLD, CONTEXTUAL_RECALL_THRESHOLD,
     CONTEXTUAL_RELEVANCY_THRESHOLD, HALLUCINATION_THRESHOLD,
@@ -118,14 +119,35 @@ from langchain_chroma import Chroma
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
+from langchain_core.documents import Document as LCDocument
+from langchain_core.retrievers import BaseRetriever
 from langsmith import traceable
+from sentence_transformers import CrossEncoder
 
 _embeddings = OllamaEmbeddings(model=EMBED_MODEL)
 _vectorstore = Chroma(persist_directory=NORTHSTAR_DB_PATH, embedding_function=_embeddings)
 
+# Cross-encoder reranker — downloads ~85 MB model on first use, then cached locally
+print(f"[reranker] Loading {RERANKER_MODEL} ...")
+_cross_encoder = CrossEncoder(RERANKER_MODEL)
+print("[reranker] Ready.")
 
-def _get_retriever(k: int = RETRIEVAL_K):
-    return _vectorstore.as_retriever(search_kwargs={"k": k})
+
+class _RerankedRetriever(BaseRetriever):
+    """Fetch RERANKER_FETCH_K chunks via embedding search, rerank with a cross-encoder, keep top RETRIEVAL_K."""
+
+    def _get_relevant_documents(self, query: str) -> list[LCDocument]:
+        candidates = _vectorstore.similarity_search(query, k=RERANKER_FETCH_K)
+        if not candidates:
+            return []
+        pairs  = [(query, doc.page_content) for doc in candidates]
+        scores = _cross_encoder.predict(pairs)
+        ranked = sorted(zip(scores, candidates), key=lambda x: x[0], reverse=True)
+        return [doc for _, doc in ranked[:RETRIEVAL_K]]
+
+
+def _get_retriever(k: int = RETRIEVAL_K):   # k kept for API compat; top_n is fixed at RETRIEVAL_K
+    return _RerankedRetriever()
 
 
 _RAG_PROMPT = ChatPromptTemplate.from_template(_load_prompt("rag_grounding_v1.txt"))
@@ -399,6 +421,7 @@ def main():
         f"northstar"
         f"-k{RETRIEVAL_K}"
         f"-chunk{NORTHSTAR_CHUNK_SIZE}o{NORTHSTAR_CHUNK_OVERLAP}"
+        f"-rerank{RERANKER_FETCH_K}"
         f"-{chat_label}"
         f"-judge-{judge_label}"
     )
@@ -408,6 +431,8 @@ def main():
         "retrieval_k":      RETRIEVAL_K,
         "chunk_size":       NORTHSTAR_CHUNK_SIZE,
         "chunk_overlap":    NORTHSTAR_CHUNK_OVERLAP,
+        "reranker":         RERANKER_MODEL,
+        "reranker_fetch_k": RERANKER_FETCH_K,
         "embed_model":      EMBED_MODEL,
         "chat_model":       CHAT_MODEL,
         "temperature":      TEMPERATURE,

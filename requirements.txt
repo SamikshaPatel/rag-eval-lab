@@ -14,3 +14,4 @@ deepeval>=0.21             # pytest-style eval framework (step 7)
 langsmith>=0.1             # tracing client + eval UI; free Developer tier
 python-dotenv>=1.0         # loads your .env
 python-docx>=1.1           # reads .docx corpus files (Northstar)
+sentence-transformers>=3.0 # cross-encoder reranker (runs locally, no API key)

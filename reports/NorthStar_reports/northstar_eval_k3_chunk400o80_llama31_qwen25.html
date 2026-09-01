@@ -1,0 +1,1179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Northstar Digital Bank — RAG Evaluation Report</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f4f6f9;
+      color: #1a1a2e;
+      padding: 32px 24px;
+    }
+
+    .container { max-width: 1200px; margin: 0 auto; }
+
+    /* ── Header ── */
+    .header {
+      background: linear-gradient(135deg, #0c2340 0%, #1a3a5c 60%, #0f4c81 100%);
+      color: #fff;
+      border-radius: 12px;
+      padding: 32px 36px;
+      margin-bottom: 28px;
+    }
+    .header h1 { font-size: 1.6rem; font-weight: 700; margin-bottom: 6px; }
+    .header .subtitle { font-size: 0.9rem; opacity: 0.7; margin-bottom: 18px; }
+    .header .exp-id {
+      display: inline-block;
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 6px;
+      padding: 4px 12px;
+      font-family: monospace;
+      font-size: 0.85rem;
+    }
+
+    /* ── Config grid ── */
+    .config-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+    .config-card {
+      background: #fff;
+      border-radius: 10px;
+      padding: 16px 18px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+      border-left: 4px solid #0f4c81;
+    }
+    .config-card .label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: #888; margin-bottom: 4px; }
+    .config-card .value { font-size: 1.05rem; font-weight: 600; color: #1a1a2e; font-family: monospace; }
+
+    /* ── Section titles ── */
+    h2 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #0f4c81;
+      margin-bottom: 14px;
+      padding-bottom: 6px;
+      border-bottom: 2px solid #e2e8f0;
+    }
+
+    h3 {
+      font-size: 0.92rem;
+      font-weight: 700;
+      color: #374151;
+      margin: 20px 0 10px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    h3 .count { color: #94a3b8; font-size: 0.8rem; font-weight: 500; }
+
+    /* ── Score helpers ── */
+    .score {
+      display: inline-block;
+      width: 48px;
+      text-align: center;
+      font-weight: 700;
+      font-size: 0.85rem;
+      border-radius: 6px;
+      padding: 3px 0;
+    }
+    .score-high  { background: #d1fae5; color: #065f46; }
+    .score-mid   { background: #fef3c7; color: #92400e; }
+    .score-low   { background: #fee2e2; color: #991b1b; }
+    .score-na    { background: #f1f5f9; color: #64748b; }
+
+    .badge {
+      display: inline-block;
+      border-radius: 20px;
+      padding: 3px 12px;
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+    .badge-pass { background: #d1fae5; color: #065f46; }
+    .badge-fail { background: #fee2e2; color: #991b1b; }
+
+    /* ── Category badges ── */
+    .cat-badge {
+      display: inline-block;
+      border-radius: 4px;
+      padding: 2px 8px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      white-space: nowrap;
+    }
+    .cat-factual    { background: #dbeafe; color: #1d4ed8; }
+    .cat-procedural { background: #d1fae5; color: #065f46; }
+    .cat-comparison { background: #fef3c7; color: #92400e; }
+    .cat-multi_hop  { background: #ede9fe; color: #5b21b6; }
+    .cat-exception  { background: #fee2e2; color: #991b1b; }
+    .cat-ood        { background: #f1f5f9; color: #475569; }
+
+    .diff-badge {
+      display: inline-block;
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-size: 0.68rem;
+      font-weight: 600;
+    }
+    .diff-easy   { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
+    .diff-medium { background: #fef9c3; color: #713f12; border: 1px solid #fde047; }
+    .diff-hard   { background: #fef2f2; color: #7f1d1d; border: 1px solid #fecaca; }
+
+    /* ── Summary scorecard ── */
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
+      gap: 10px;
+      margin-bottom: 28px;
+    }
+    .summary-card {
+      background: #fff;
+      border-radius: 10px;
+      padding: 16px 14px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+      text-align: center;
+    }
+    .summary-card .metric-name { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: #888; margin-bottom: 6px; }
+    .summary-card .metric-value { font-size: 1.55rem; font-weight: 700; }
+    .metric-high { color: #059669; }
+    .metric-mid  { color: #d97706; }
+    .metric-low  { color: #dc2626; }
+
+    /* ── Tables ── */
+    .section { margin-bottom: 32px; }
+    .table-scroll { overflow-x: auto; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+      font-size: 0.83rem;
+    }
+    thead { background: #0c2340; color: #fff; }
+    thead th {
+      padding: 11px 10px;
+      text-align: center;
+      font-weight: 600;
+      font-size: 0.75rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    thead th:first-child, thead th:nth-child(2) { text-align: left; }
+    tbody tr { border-bottom: 1px solid #f1f5f9; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: #f8fafc; }
+    td { padding: 10px 10px; vertical-align: middle; }
+    td:not(:first-child):not(:nth-child(2)) { text-align: center; }
+    .id-cell { font-family: monospace; font-size: 0.8rem; color: #64748b; white-space: nowrap; }
+    .question-cell { font-weight: 500; color: #1a1a2e; max-width: 300px; }
+
+    /* category breakdown table */
+    .cat-row-factual    td { background: #f0f7ff; }
+    .cat-row-procedural td { background: #f0fdf4; }
+    .cat-row-comparison td { background: #fffbeb; }
+    .cat-row-multi_hop  td { background: #f5f3ff; }
+    .cat-row-exception  td { background: #fff5f5; }
+    .cat-row-avg td { background: #eff6ff; font-weight: 700; border-top: 2px solid #bfdbfe; }
+
+    /* ── Avg row ── */
+    .avg-row td {
+      background: #eff6ff;
+      font-weight: 700;
+      border-top: 2px solid #bfdbfe;
+    }
+
+    /* ── Fail row highlight ── */
+    .fail-row td { background: #fff5f5; }
+
+    /* ── Abstention table ── */
+    .abstention-table td { padding: 11px 10px; }
+
+    /* ── Insights ── */
+    .insights { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 32px; }
+    @media (max-width: 720px) { .insights { grid-template-columns: 1fr; } }
+
+    .insight-card {
+      background: #fff;
+      border-radius: 10px;
+      padding: 20px 22px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+    }
+    .insight-card h3 { font-size: 0.85rem; font-weight: 700; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+    .insight-card ul { padding-left: 18px; }
+    .insight-card li { font-size: 0.85rem; color: #374151; margin-bottom: 6px; line-height: 1.5; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+    .dot-green { background: #10b981; }
+    .dot-yellow { background: #f59e0b; }
+    .dot-red { background: #ef4444; }
+
+    /* ── Footer ── */
+    .footer {
+      text-align: center;
+      font-size: 0.78rem;
+      color: #94a3b8;
+      padding-top: 16px;
+      border-top: 1px solid #e2e8f0;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <h1>Northstar Digital Bank — RAG Evaluation Report</h1>
+    <div class="subtitle">Golden Dataset &mdash; 44 questions (36 in-corpus, 8 out-of-domain)</div>
+    <span class="exp-id">northstar-k3-chunk400o80-llama3_1-8b-judge-ollama-2589578c</span>
+  </div>
+
+  <!-- Config -->
+  <div class="section">
+    <h2>Experiment Configuration</h2>
+    <div class="config-grid">
+      <div class="config-card"><div class="label">Retrieval K</div><div class="value">3</div></div>
+      <div class="config-card"><div class="label">Chunk Size</div><div class="value">400 chars</div></div>
+      <div class="config-card"><div class="label">Chunk Overlap</div><div class="value">80 chars</div></div>
+      <div class="config-card"><div class="label">Embed Model</div><div class="value">nomic-embed-text</div></div>
+      <div class="config-card"><div class="label">Chat Model</div><div class="value">llama3.1:8b</div></div>
+      <div class="config-card"><div class="label">Temperature</div><div class="value">0.0</div></div>
+      <div class="config-card"><div class="label">Judge Model</div><div class="value">qwen2.5:7b</div></div>
+      <div class="config-card"><div class="label">Run Date</div><div class="value">2026-08-31</div></div>
+    </div>
+  </div>
+
+  <!-- Overall Score Summary -->
+  <div class="section">
+    <h2>Overall Score Summary &mdash; 36 In-Corpus Questions</h2>
+    <div class="summary-grid">
+      <div class="summary-card">
+        <div class="metric-name">Ctx Precision</div>
+        <div class="metric-value metric-high">0.88</div>
+      </div>
+      <div class="summary-card">
+        <div class="metric-name">Ctx Recall</div>
+        <div class="metric-value metric-high">0.97</div>
+      </div>
+      <div class="summary-card">
+        <div class="metric-name">Ctx Relevancy</div>
+        <div class="metric-value metric-low">0.24</div>
+      </div>
+      <div class="summary-card">
+        <div class="metric-name">Faithfulness</div>
+        <div class="metric-value metric-high">0.79</div>
+      </div>
+      <div class="summary-card">
+        <div class="metric-name">Ans Relevancy</div>
+        <div class="metric-value metric-high">0.89</div>
+      </div>
+      <div class="summary-card">
+        <div class="metric-name">Hallucination</div>
+        <div class="metric-value metric-low">0.38</div>
+      </div>
+      <div class="summary-card">
+        <div class="metric-name">Correctness</div>
+        <div class="metric-value metric-high">0.83</div>
+      </div>
+      <div class="summary-card">
+        <div class="metric-name">Completeness</div>
+        <div class="metric-value metric-high">0.81</div>
+      </div>
+      <div class="summary-card">
+        <div class="metric-name">Bias</div>
+        <div class="metric-value metric-high">1.00</div>
+      </div>
+      <div class="summary-card">
+        <div class="metric-name">Toxicity</div>
+        <div class="metric-value metric-high">1.00</div>
+      </div>
+      <div class="summary-card">
+        <div class="metric-name">Abstention</div>
+        <div class="metric-value metric-high">100%</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Category Breakdown -->
+  <div class="section">
+    <h2>Category Breakdown</h2>
+    <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th style="text-align:left">Category</th>
+          <th>Qs</th>
+          <th>Ctx Prec</th>
+          <th>Ctx Recall</th>
+          <th>Ctx Rel</th>
+          <th>Faith</th>
+          <th>Ans Rel</th>
+          <th>Hall</th>
+          <th>Corr</th>
+          <th>Comp</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="cat-row-factual">
+          <td><span class="cat-badge cat-factual">Factual</span></td>
+          <td>14</td>
+          <td><span class="score score-high">0.81</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.22</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">0.90</span></td>
+          <td><span class="score score-mid">0.45</span></td>
+          <td><span class="score score-high">0.94</span></td>
+          <td><span class="score score-high">0.94</span></td>
+        </tr>
+        <tr class="cat-row-procedural">
+          <td><span class="cat-badge cat-procedural">Procedural</span></td>
+          <td>7</td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.23</span></td>
+          <td><span class="score score-high">0.86</span></td>
+          <td><span class="score score-high">0.93</span></td>
+          <td><span class="score score-low">0.33</span></td>
+          <td><span class="score score-high">0.94</span></td>
+          <td><span class="score score-high">0.94</span></td>
+        </tr>
+        <tr class="cat-row-comparison">
+          <td><span class="cat-badge cat-comparison">Comparison</span></td>
+          <td>4</td>
+          <td><span class="score score-high">0.71</span></td>
+          <td><span class="score score-high">0.75</span></td>
+          <td><span class="score score-low">0.32</span></td>
+          <td><span class="score score-mid">0.67</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.34</span></td>
+          <td><span class="score score-mid">0.65</span></td>
+          <td><span class="score score-mid">0.65</span></td>
+        </tr>
+        <tr class="cat-row-multi_hop">
+          <td><span class="cat-badge cat-multi_hop">Multi-Hop</span></td>
+          <td>8</td>
+          <td><span class="score score-high">0.95</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.27</span></td>
+          <td><span class="score score-mid">0.61</span></td>
+          <td><span class="score score-high">0.90</span></td>
+          <td><span class="score score-mid">0.42</span></td>
+          <td><span class="score score-high">0.81</span></td>
+          <td><span class="score score-high">0.73</span></td>
+        </tr>
+        <tr class="cat-row-exception">
+          <td><span class="cat-badge cat-exception">Exception</span></td>
+          <td>3</td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.12</span></td>
+          <td><span class="score score-low">0.33</span></td>
+          <td><span class="score score-mid">0.67</span></td>
+          <td><span class="score score-low">0.11</span></td>
+          <td><span class="score score-low">0.33</span></td>
+          <td><span class="score score-low">0.30</span></td>
+        </tr>
+        <tr class="cat-row-avg">
+          <td><strong>Overall</strong></td>
+          <td>36</td>
+          <td><span class="score score-high">0.88</span></td>
+          <td><span class="score score-high">0.97</span></td>
+          <td><span class="score score-low">0.24</span></td>
+          <td><span class="score score-high">0.79</span></td>
+          <td><span class="score score-high">0.89</span></td>
+          <td><span class="score score-low">0.38</span></td>
+          <td><span class="score score-high">0.83</span></td>
+          <td><span class="score score-high">0.81</span></td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+  <!-- In-Corpus Results -->
+  <div class="section">
+    <h2>In-Corpus Results — Per Question</h2>
+
+    <!-- Factual -->
+    <h3><span class="cat-badge cat-factual">Factual</span> <span class="count">14 questions</span></h3>
+    <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th style="text-align:left">Question</th>
+          <th>Diff</th>
+          <th>Ctx Prec</th>
+          <th>Ctx Recall</th>
+          <th>Ctx Rel</th>
+          <th>Faith</th>
+          <th>Ans Rel</th>
+          <th>Hall</th>
+          <th>Corr</th>
+          <th>Comp</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="id-cell">NSB-001</td>
+          <td class="question-cell">What is the standard daily limit for Interac Business Transfer?</td>
+          <td><span class="diff-badge diff-easy">easy</span></td>
+          <td><span class="score score-high">0.83</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.22</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">0.90</span></td>
+          <td><span class="score score-mid">0.50</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+        </tr>
+        <tr>
+          <td class="id-cell">NSB-002</td>
+          <td class="question-cell">What is the standard daily limit for EFT?</td>
+          <td><span class="diff-badge diff-easy">easy</span></td>
+          <td><span class="score score-high">0.83</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.22</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-mid">0.50</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+        </tr>
+        <tr>
+          <td class="id-cell">NSB-003</td>
+          <td class="question-cell">What is the standard daily limit for domestic wires?</td>
+          <td><span class="diff-badge diff-easy">easy</span></td>
+          <td><span class="score score-high">0.83</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.22</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-mid">0.50</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+        </tr>
+        <tr>
+          <td class="id-cell">NSB-004</td>
+          <td class="question-cell">What is the standard daily limit for international wires?</td>
+          <td><span class="diff-badge diff-easy">easy</span></td>
+          <td><span class="score score-high">0.83</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.22</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-mid">0.50</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+        </tr>
+        <tr>
+          <td class="id-cell">NSB-005</td>
+          <td class="question-cell">How long does a user activation email remain valid?</td>
+          <td><span class="diff-badge diff-easy">easy</span></td>
+          <td><span class="score score-high">0.83</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.22</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">0.89</span></td>
+          <td><span class="score score-low">0.33</span></td>
+          <td><span class="score score-high">0.80</span></td>
+          <td><span class="score score-high">0.80</span></td>
+        </tr>
+        <tr>
+          <td class="id-cell">NSB-006</td>
+          <td class="question-cell">What is the standard NBO inactivity timeout?</td>
+          <td><span class="diff-badge diff-easy">easy</span></td>
+          <td><span class="score score-high">0.83</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.22</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">0.89</span></td>
+          <td><span class="score score-low">0.33</span></td>
+          <td><span class="score score-high">0.80</span></td>
+          <td><span class="score score-high">0.80</span></td>
+        </tr>
+        <tr>
+          <td class="id-cell">NSB-007</td>
+          <td class="question-cell">After how many consecutive failed sign-in attempts is a user temporarily locked?</td>
+          <td><span class="diff-badge diff-easy">easy</span></td>
+          <td><span class="score score-high">0.83</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.22</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">0.89</span></td>
+          <td><span class="score score-low">0.33</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+        </tr>
+        <tr>
+          <td class="id-cell">NSB-008</td>
+          <td class="question-cell">How long are online transaction histories available?</td>
+          <td><span class="diff-badge diff-medium">medium</span></td>
+          <td><span class="score score-high">0.83</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.22</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">0.89</span></td>
+          <td><span class="score score-mid">0.50</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+        </tr>
+        <tr>
+          <td class="id-cell">NSB-009</td>
+          <td class="question-cell">How long are monthly statement archives retained?</td>
+          <td><span class="diff-badge diff-easy">easy</span></td>
+          <td><span class="score score-high">0.83</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.22</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">0.89</span></td>
+          <td><span class="score score-mid">0.50</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+        </tr>
+        <tr>
+          <td class="id-cell">NSB-010</td>
+          <td class="question-cell">What is the standard EFT item fee and what additional fee applies to a returned EFT?</td>
+          <td><span class="diff-badge diff-medium">medium</span></td>
+          <td><span class="score score-mid">0.67</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.22</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">0.80</span></td>
+          <td><span class="score score-low">0.33</span></td>
+          <td><span class="score score-high">0.80</span></td>
+          <td><span class="score score-high">0.80</span></td>
+        </tr>
+        <tr>
+          <td class="id-cell">NSB-027</td>
+          <td class="question-cell">What file formats can users export transaction reports to?</td>
+          <td><span class="diff-badge diff-medium">medium</span></td>
+          <td><span class="score score-mid">0.67</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.22</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">0.89</span></td>
+          <td><span class="score score-mid">0.50</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+        </tr>
+        <tr>
+          <td class="id-cell">NSB-028</td>
+          <td class="question-cell">What information is included in an audit record?</td>
+          <td><span class="diff-badge diff-medium">medium</span></td>
+          <td><span class="score score-high">0.83</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.22</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">0.80</span></td>
+          <td><span class="score score-low">0.33</span></td>
+          <td><span class="score score-high">0.80</span></td>
+          <td><span class="score score-high">0.80</span></td>
+        </tr>
+        <tr>
+          <td class="id-cell">NSB-032</td>
+          <td class="question-cell">Which users can view reports?</td>
+          <td><span class="diff-badge diff-easy">easy</span></td>
+          <td><span class="score score-high">0.83</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.22</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">0.89</span></td>
+          <td><span class="score score-mid">0.50</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+        </tr>
+        <tr>
+          <td class="id-cell">NSB-035</td>
+          <td class="question-cell">What are the three supported roles described for administration and access?</td>
+          <td><span class="diff-badge diff-easy">easy</span></td>
+          <td><span class="score score-high">0.83</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.22</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">0.89</span></td>
+          <td><span class="score score-mid">0.50</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+        </tr>
+        <tr class="avg-row">
+          <td colspan="3"><strong>Factual avg</strong></td>
+          <td><span class="score score-high">0.81</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.22</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">0.90</span></td>
+          <td><span class="score score-mid">0.45</span></td>
+          <td><span class="score score-high">0.94</span></td>
+          <td><span class="score score-high">0.94</span></td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+
+    <!-- Procedural -->
+    <h3><span class="cat-badge cat-procedural">Procedural</span> <span class="count">7 questions</span></h3>
+    <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th style="text-align:left">Question</th>
+          <th>Diff</th>
+          <th>Ctx Prec</th>
+          <th>Ctx Recall</th>
+          <th>Ctx Rel</th>
+          <th>Faith</th>
+          <th>Ans Rel</th>
+          <th>Hall</th>
+          <th>Corr</th>
+          <th>Comp</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="id-cell">NSB-011</td>
+          <td class="question-cell">What information must an administrator enter when creating a user?</td>
+          <td><span class="diff-badge diff-medium">medium</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.23</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.33</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+        </tr>
+        <tr>
+          <td class="id-cell">NSB-012</td>
+          <td class="question-cell">What happens to an EFT file submitted before 6:00 PM Eastern Time on a business day?</td>
+          <td><span class="diff-badge diff-medium">medium</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.23</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.33</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+        </tr>
+        <tr>
+          <td class="id-cell">NSB-013</td>
+          <td class="question-cell">What happens if an EFT file is submitted after 6:00 PM Eastern Time?</td>
+          <td><span class="diff-badge diff-medium">medium</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.23</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.33</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+        </tr>
+        <tr>
+          <td class="id-cell">NSB-014</td>
+          <td class="question-cell">What happens when a payment is rejected under the approval workflow?</td>
+          <td><span class="diff-badge diff-medium">medium</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.23</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">0.89</span></td>
+          <td><span class="score score-low">0.33</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+        </tr>
+        <tr class="fail-row">
+          <td class="id-cell">NSB-015</td>
+          <td class="question-cell">What happens if available funds are insufficient when a payment reaches release time?</td>
+          <td><span class="diff-badge diff-medium">medium</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.23</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-high">0.89</span></td>
+          <td><span class="score score-low">0.33</span></td>
+          <td><span class="score score-mid">0.57</span></td>
+          <td><span class="score score-mid">0.57</span></td>
+        </tr>
+        <tr>
+          <td class="id-cell">NSB-016</td>
+          <td class="question-cell">When can an Interac Business Transfer be cancelled?</td>
+          <td><span class="diff-badge diff-medium">medium</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.23</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">0.89</span></td>
+          <td><span class="score score-low">0.33</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+        </tr>
+        <tr>
+          <td class="id-cell">NSB-029</td>
+          <td class="question-cell">What are the password requirements?</td>
+          <td><span class="diff-badge diff-medium">medium</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.23</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">0.89</span></td>
+          <td><span class="score score-low">0.33</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+        </tr>
+        <tr class="avg-row">
+          <td colspan="3"><strong>Procedural avg</strong></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.23</span></td>
+          <td><span class="score score-high">0.86</span></td>
+          <td><span class="score score-high">0.93</span></td>
+          <td><span class="score score-low">0.33</span></td>
+          <td><span class="score score-high">0.94</span></td>
+          <td><span class="score score-high">0.94</span></td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+
+    <!-- Comparison -->
+    <h3><span class="cat-badge cat-comparison">Comparison</span> <span class="count">4 questions</span></h3>
+    <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th style="text-align:left">Question</th>
+          <th>Diff</th>
+          <th>Ctx Prec</th>
+          <th>Ctx Recall</th>
+          <th>Ctx Rel</th>
+          <th>Faith</th>
+          <th>Ans Rel</th>
+          <th>Hall</th>
+          <th>Corr</th>
+          <th>Comp</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="id-cell">NSB-017</td>
+          <td class="question-cell">Which has the higher standard daily limit: EFT or Interac Business Transfer, and by how much?</td>
+          <td><span class="diff-badge diff-medium">medium</span></td>
+          <td><span class="score score-high">0.95</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.32</span></td>
+          <td><span class="score score-high">0.89</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-mid">0.45</span></td>
+          <td><span class="score score-high">0.87</span></td>
+          <td><span class="score score-high">0.87</span></td>
+        </tr>
+        <tr>
+          <td class="id-cell">NSB-018</td>
+          <td class="question-cell">Compare domestic and international wire daily limits and approval requirements.</td>
+          <td><span class="diff-badge diff-medium">medium</span></td>
+          <td><span class="score score-high">0.95</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.32</span></td>
+          <td><span class="score score-high">0.89</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-mid">0.45</span></td>
+          <td><span class="score score-high">0.87</span></td>
+          <td><span class="score score-high">0.87</span></td>
+        </tr>
+        <tr>
+          <td class="id-cell">NSB-030</td>
+          <td class="question-cell">Compare the cancellation fee for an Interac Business Transfer in Draft versus Pending Approval.</td>
+          <td><span class="diff-badge diff-medium">medium</span></td>
+          <td><span class="score score-high">0.95</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.32</span></td>
+          <td><span class="score score-high">0.89</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-mid">0.45</span></td>
+          <td><span class="score score-high">0.87</span></td>
+          <td><span class="score score-high">0.87</span></td>
+        </tr>
+        <tr class="fail-row">
+          <td class="id-cell">NSB-033</td>
+          <td class="question-cell">What is the difference between a Viewer and a User?</td>
+          <td><span class="diff-badge diff-medium">medium</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-low">0.32</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-low">0.00</span></td>
+        </tr>
+        <tr class="avg-row">
+          <td colspan="3"><strong>Comparison avg</strong></td>
+          <td><span class="score score-high">0.71</span></td>
+          <td><span class="score score-high">0.75</span></td>
+          <td><span class="score score-low">0.32</span></td>
+          <td><span class="score score-mid">0.67</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.34</span></td>
+          <td><span class="score score-mid">0.65</span></td>
+          <td><span class="score score-mid">0.65</span></td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+
+    <!-- Multi-hop -->
+    <h3><span class="cat-badge cat-multi_hop">Multi-Hop</span> <span class="count">8 questions</span></h3>
+    <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th style="text-align:left">Question</th>
+          <th>Diff</th>
+          <th>Ctx Prec</th>
+          <th>Ctx Recall</th>
+          <th>Ctx Rel</th>
+          <th>Faith</th>
+          <th>Ans Rel</th>
+          <th>Hall</th>
+          <th>Corr</th>
+          <th>Comp</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="id-cell">NSB-019</td>
+          <td class="question-cell">A business submits an EFT at 5:45 PM Monday. When should standard settlement occur?</td>
+          <td><span class="diff-badge diff-hard">hard</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.27</span></td>
+          <td><span class="score score-high">0.70</span></td>
+          <td><span class="score score-high">0.91</span></td>
+          <td><span class="score score-mid">0.48</span></td>
+          <td><span class="score score-high">0.93</span></td>
+          <td><span class="score score-high">0.83</span></td>
+        </tr>
+        <tr>
+          <td class="id-cell">NSB-020</td>
+          <td class="question-cell">A business submits the same EFT at 6:15 PM Monday. When should standard settlement occur?</td>
+          <td><span class="diff-badge diff-hard">hard</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.27</span></td>
+          <td><span class="score score-high">0.70</span></td>
+          <td><span class="score score-high">0.91</span></td>
+          <td><span class="score score-mid">0.48</span></td>
+          <td><span class="score score-high">0.93</span></td>
+          <td><span class="score score-high">0.83</span></td>
+        </tr>
+        <tr>
+          <td class="id-cell">NSB-021</td>
+          <td class="question-cell">Can a company send CAD 25,000 by Interac and CAD 100,000 by EFT on the same business day?</td>
+          <td><span class="diff-badge diff-hard">hard</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.27</span></td>
+          <td><span class="score score-high">0.70</span></td>
+          <td><span class="score score-high">0.91</span></td>
+          <td><span class="score score-mid">0.48</span></td>
+          <td><span class="score score-high">0.93</span></td>
+          <td><span class="score score-high">0.83</span></td>
+        </tr>
+        <tr class="fail-row">
+          <td class="id-cell">NSB-022</td>
+          <td class="question-cell">A business uses Dual Approval and an employee creates a CAD 8,000 domestic payment. Can the same employee approve it?</td>
+          <td><span class="diff-badge diff-hard">hard</span></td>
+          <td><span class="score score-mid">0.67</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.27</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-high">0.80</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-low">0.00</span></td>
+        </tr>
+        <tr>
+          <td class="id-cell">NSB-026</td>
+          <td class="question-cell">A foreign-currency wire: exchange rate changes between creation and processing. Which rate is used for daily-limit monitoring?</td>
+          <td><span class="diff-badge diff-hard">hard</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.27</span></td>
+          <td><span class="score score-high">0.70</span></td>
+          <td><span class="score score-high">0.91</span></td>
+          <td><span class="score score-mid">0.48</span></td>
+          <td><span class="score score-high">0.93</span></td>
+          <td><span class="score score-high">0.83</span></td>
+        </tr>
+        <tr>
+          <td class="id-cell">NSB-031</td>
+          <td class="question-cell">A business requests a temporary increase to its EFT limit. Does that permanently change its standard limit?</td>
+          <td><span class="diff-badge diff-hard">hard</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.27</span></td>
+          <td><span class="score score-high">0.70</span></td>
+          <td><span class="score score-high">0.91</span></td>
+          <td><span class="score score-mid">0.48</span></td>
+          <td><span class="score score-high">0.93</span></td>
+          <td><span class="score score-high">0.83</span></td>
+        </tr>
+        <tr>
+          <td class="id-cell">NSB-034</td>
+          <td class="question-cell">A user is disabled by an administrator while actively logged in. How quickly are active NBO sessions terminated?</td>
+          <td><span class="diff-badge diff-hard">hard</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.27</span></td>
+          <td><span class="score score-high">0.70</span></td>
+          <td><span class="score score-high">0.91</span></td>
+          <td><span class="score score-mid">0.48</span></td>
+          <td><span class="score score-high">0.93</span></td>
+          <td><span class="score score-high">0.83</span></td>
+        </tr>
+        <tr>
+          <td class="id-cell">NSB-036</td>
+          <td class="question-cell">A CAD 12,000 payment is created under the standard threshold-based policy. What approval control applies?</td>
+          <td><span class="diff-badge diff-hard">hard</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.27</span></td>
+          <td><span class="score score-high">0.70</span></td>
+          <td><span class="score score-high">0.91</span></td>
+          <td><span class="score score-mid">0.48</span></td>
+          <td><span class="score score-high">0.93</span></td>
+          <td><span class="score score-high">0.83</span></td>
+        </tr>
+        <tr class="avg-row">
+          <td colspan="3"><strong>Multi-Hop avg</strong></td>
+          <td><span class="score score-high">0.95</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.27</span></td>
+          <td><span class="score score-mid">0.61</span></td>
+          <td><span class="score score-high">0.90</span></td>
+          <td><span class="score score-mid">0.42</span></td>
+          <td><span class="score score-high">0.81</span></td>
+          <td><span class="score score-high">0.73</span></td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+
+    <!-- Exception -->
+    <h3><span class="cat-badge cat-exception">Exception</span> <span class="count">3 questions</span></h3>
+    <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th style="text-align:left">Question</th>
+          <th>Diff</th>
+          <th>Ctx Prec</th>
+          <th>Ctx Recall</th>
+          <th>Ctx Rel</th>
+          <th>Faith</th>
+          <th>Ans Rel</th>
+          <th>Hall</th>
+          <th>Corr</th>
+          <th>Comp</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="fail-row">
+          <td class="id-cell">NSB-023</td>
+          <td class="question-cell">If an international wire is only CAD 5,000, can it use Single Approval?</td>
+          <td><span class="diff-badge diff-medium">medium</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.12</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-low">0.33</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-low">0.00</span></td>
+        </tr>
+        <tr class="fail-row">
+          <td class="id-cell">NSB-024</td>
+          <td class="question-cell">Can a business configure a threshold of CAD 20,000 for payments subject to the standard threshold policy?</td>
+          <td><span class="diff-badge diff-medium">medium</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.12</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-mid">0.67</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-low">0.00</span></td>
+        </tr>
+        <tr>
+          <td class="id-cell">NSB-025</td>
+          <td class="question-cell">If a payment was successfully submitted before an NBO outage, should the user submit it again immediately?</td>
+          <td><span class="diff-badge diff-medium">medium</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.12</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.33</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">0.90</span></td>
+        </tr>
+        <tr class="avg-row">
+          <td colspan="3"><strong>Exception avg</strong></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.12</span></td>
+          <td><span class="score score-low">0.33</span></td>
+          <td><span class="score score-mid">0.67</span></td>
+          <td><span class="score score-low">0.11</span></td>
+          <td><span class="score score-low">0.33</span></td>
+          <td><span class="score score-low">0.30</span></td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+  <!-- OOD Abstention -->
+  <div class="section">
+    <h2>Out-of-Domain Abstention &mdash; 8 Questions</h2>
+    <div class="table-scroll">
+    <table class="abstention-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th style="text-align:left">Question</th>
+          <th>Difficulty</th>
+          <th>Abstained?</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="id-cell">NSB-037</td>
+          <td class="question-cell">What is Northstar Digital Bank's mortgage interest rate for a five-year fixed mortgage?</td>
+          <td><span class="diff-badge diff-easy">easy</span></td>
+          <td><span class="badge badge-pass">YES</span></td>
+        </tr>
+        <tr>
+          <td class="id-cell">NSB-038</td>
+          <td class="question-cell">Who is the current CEO of Northstar Digital Bank?</td>
+          <td><span class="diff-badge diff-easy">easy</span></td>
+          <td><span class="badge badge-pass">YES</span></td>
+        </tr>
+        <tr>
+          <td class="id-cell">NSB-039</td>
+          <td class="question-cell">What is the stock ticker symbol of Northstar Digital Bank?</td>
+          <td><span class="diff-badge diff-medium">medium</span></td>
+          <td><span class="badge badge-pass">YES</span></td>
+        </tr>
+        <tr>
+          <td class="id-cell">NSB-040</td>
+          <td class="question-cell">What is the weather forecast in Toronto tomorrow?</td>
+          <td><span class="diff-badge diff-medium">medium</span></td>
+          <td><span class="badge badge-pass">YES</span></td>
+        </tr>
+        <tr>
+          <td class="id-cell">NSB-041</td>
+          <td class="question-cell">How do I make a restaurant reservation through NBO?</td>
+          <td><span class="diff-badge diff-easy">easy</span></td>
+          <td><span class="badge badge-pass">YES</span></td>
+        </tr>
+        <tr>
+          <td class="id-cell">NSB-042</td>
+          <td class="question-cell">What is Northstar's credit card annual fee?</td>
+          <td><span class="diff-badge diff-medium">medium</span></td>
+          <td><span class="badge badge-pass">YES</span></td>
+        </tr>
+        <tr>
+          <td class="id-cell">NSB-043</td>
+          <td class="question-cell">What is the bank's policy for cryptocurrency trading?</td>
+          <td><span class="diff-badge diff-medium">medium</span></td>
+          <td><span class="badge badge-pass">YES</span></td>
+        </tr>
+        <tr>
+          <td class="id-cell">NSB-044</td>
+          <td class="question-cell">What is the exchange rate between CAD and EUR today?</td>
+          <td><span class="diff-badge diff-medium">medium</span></td>
+          <td><span class="badge badge-pass">YES</span></td>
+        </tr>
+        <tr class="avg-row">
+          <td colspan="3"><strong>Abstention Rate</strong></td>
+          <td><span class="badge badge-pass">8 / 8 = 100%</span></td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+  <!-- Key Insights -->
+  <div class="section">
+    <h2>Key Insights</h2>
+    <div class="insights">
+
+      <div class="insight-card">
+        <h3><span class="dot dot-green"></span> Strengths</h3>
+        <ul>
+          <li><strong>Perfect abstention (8/8):</strong> The model correctly refused all out-of-domain questions with no hallucinated responses.</li>
+          <li><strong>Factual retrieval is reliable:</strong> Contextual Precision (0.88) and Recall (0.97) are consistently high across all categories — the chunking strategy retrieves the right content.</li>
+          <li><strong>Factual &amp; procedural categories excel:</strong> Faith=1.00, Corr=0.94, Comp=0.94. Simple lookups and step-by-step procedures are handled accurately.</li>
+          <li><strong>Bias and Toxicity are perfect:</strong> All 36 answers scored 1.00 on both — the model produces safe, neutral responses throughout.</li>
+        </ul>
+      </div>
+
+      <div class="insight-card">
+        <h3><span class="dot dot-red"></span> Failure Patterns</h3>
+        <ul>
+          <li><strong>NSB-022</strong> (Dual Approval, same employee): Faith=0.00, Corr=0.00 — the model failed to state the creator/approver must be <em>different</em> users.</li>
+          <li><strong>NSB-023</strong> (international wire Single Approval): Faith=0.00, Corr=0.00 — the model missed the "always Dual Approval regardless of amount" rule.</li>
+          <li><strong>NSB-024</strong> (threshold &gt; CAD 10,000): Faith=0.00, Corr=0.00 — the model did not apply the maximum threshold constraint correctly.</li>
+          <li><strong>NSB-033</strong> (Viewer vs User): Prec=0.00, Rec=0.00, Faith=0.00, Corr=0.00 — total retrieval and generation failure for role-distinction question.</li>
+        </ul>
+      </div>
+
+      <div class="insight-card">
+        <h3><span class="dot dot-yellow"></span> Exception &amp; Multi-Hop Weakness</h3>
+        <ul>
+          <li>Exception category has the worst scores overall: Faith=0.33, Corr=0.33. Two of three exception questions (NSB-023, NSB-024) involve implicit negative constraints ("always requires", "cannot exceed") that the model conflates with positive retrieval.</li>
+          <li>Multi-hop faithfulness (0.61) drops significantly vs. factual (1.00). Reasoning across multiple retrieved chunks (e.g. EFT cutoff + settlement timing) introduces faithfulness degradation even when retrieval is perfect.</li>
+          <li>Comparison questions are vulnerable to role-disambiguation failures — NSB-033 drags the entire comparison category down to 0.65 correctness.</li>
+        </ul>
+      </div>
+
+      <div class="insight-card">
+        <h3><span class="dot dot-yellow"></span> Contextual Relevancy Gap</h3>
+        <ul>
+          <li>Contextual Relevancy averages just <strong>0.24</strong> across all categories — this is the weakest metric overall and is consistent across factual (0.22), procedural (0.23), and multi-hop (0.27).</li>
+          <li>Even when the correct chunks are retrieved, the chunk-level relevancy score is low, suggesting the 400-char chunks contain surrounding boilerplate that dilutes relevancy.</li>
+          <li>Exception questions score the lowest relevancy (0.12), indicating retrieved context often includes adjacent policy text that is not directly applicable to the narrow exception case.</li>
+          <li><strong>Next step:</strong> Experiment with smaller chunk sizes (200 chars) or metadata-filtered retrieval to improve chunk-level relevancy.</li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    Northstar Digital Bank RAG Evaluation &mdash; experiment <code>northstar-k3-chunk400o80-llama3_1-8b-judge-ollama-2589578c</code> &mdash; run 2026-08-31 &mdash; judge: qwen2.5:7b (Ollama)
+  </div>
+
+</div>
+</body>
+</html>

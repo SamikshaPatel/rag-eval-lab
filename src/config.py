@@ -42,9 +42,15 @@ NORTHSTAR_CHUNK_SIZE    = 200
 NORTHSTAR_CHUNK_OVERLAP = 40
 
 # --- Retrieval & generation --------------------------------------------------
-RETRIEVAL_K = 3     # chunks fetched per query
+RETRIEVAL_K = 3     # chunks kept after reranking (or fetched if no reranker)
 TEMPERATURE = 0.0   # generation temperature (0 = most deterministic)
 REPEATS     = 1     # eval_custom: bump to 3+ to measure run-to-run variance
+
+# --- Reranking ---------------------------------------------------------------
+# Cross-encoder reranker: fetch RERANKER_FETCH_K candidates, rerank, keep RETRIEVAL_K.
+# Model downloads automatically from HuggingFace on first use (~85 MB).
+RERANKER_MODEL   = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+RERANKER_FETCH_K = 10   # initial candidate pool before reranking
 
 # --- Prompt filenames --------------------------------------------------------
 # Update the string here when you version a prompt; no logic files change.

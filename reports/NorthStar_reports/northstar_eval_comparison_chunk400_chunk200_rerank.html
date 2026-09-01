@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Northstar RAG Eval — chunk400 vs chunk200 vs chunk200+rerank</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f4f6f9; color: #1a1a2e; padding: 32px 24px; }
+    .container { max-width: 1280px; margin: 0 auto; }
+
+    .header { background: linear-gradient(135deg, #0c2340 0%, #1a3a5c 60%, #0f4c81 100%); color: #fff; border-radius: 12px; padding: 32px 36px; margin-bottom: 28px; }
+    .header h1 { font-size: 1.6rem; font-weight: 700; margin-bottom: 6px; }
+    .header .subtitle { font-size: 0.9rem; opacity: 0.7; margin-bottom: 18px; }
+    .exp-ids { display: flex; gap: 10px; flex-wrap: wrap; }
+    .exp-id { display: inline-block; border-radius: 6px; padding: 4px 12px; font-family: monospace; font-size: 0.78rem; }
+    .exp-id-r1 { background: rgba(96,165,250,0.2);  border: 1px solid rgba(96,165,250,0.4); }
+    .exp-id-r2 { background: rgba(251,191,36,0.2);  border: 1px solid rgba(251,191,36,0.4); }
+    .exp-id-r3 { background: rgba(167,139,250,0.2); border: 1px solid rgba(167,139,250,0.4); }
+
+    h2 { font-size: 1.05rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #0f4c81; margin-bottom: 14px; padding-bottom: 6px; border-bottom: 2px solid #e2e8f0; }
+
+    /* Config panel */
+    .config-compare { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-bottom: 28px; }
+    @media (max-width: 800px) { .config-compare { grid-template-columns: 1fr; } }
+    .config-panel { background: #fff; border-radius: 10px; padding: 18px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
+    .config-panel h3 { font-size: 0.85rem; font-weight: 700; margin-bottom: 12px; padding-bottom: 6px; border-bottom: 2px solid; }
+    .config-panel.r1 h3 { color: #1d4ed8; border-color: #bfdbfe; }
+    .config-panel.r2 h3 { color: #92400e; border-color: #fde68a; }
+    .config-panel.r3 h3 { color: #5b21b6; border-color: #ddd6fe; }
+    .config-row { display: flex; justify-content: space-between; font-size: 0.83rem; padding: 4px 0; border-bottom: 1px solid #f1f5f9; }
+    .config-row:last-child { border-bottom: none; }
+    .config-row .key { color: #64748b; }
+    .config-row .val { font-weight: 600; font-family: monospace; }
+    .config-row.changed .val { color: #d97706; background: #fef3c7; padding: 1px 6px; border-radius: 4px; }
+    .config-row.new .val    { color: #5b21b6; background: #ede9fe; padding: 1px 6px; border-radius: 4px; }
+
+    /* Scores */
+    .score { display: inline-block; width: 46px; text-align: center; font-weight: 700; font-size: 0.83rem; border-radius: 6px; padding: 3px 0; }
+    .score-high { background: #d1fae5; color: #065f46; }
+    .score-mid  { background: #fef3c7; color: #92400e; }
+    .score-low  { background: #fee2e2; color: #991b1b; }
+
+    .winner { display: inline-block; font-size: 0.7rem; font-weight: 700; border-radius: 12px; padding: 2px 8px; white-space: nowrap; }
+    .winner-r1  { background: #dbeafe; color: #1d4ed8; }
+    .winner-r2  { background: #fef3c7; color: #92400e; }
+    .winner-r3  { background: #ede9fe; color: #5b21b6; }
+    .winner-tie { background: #f1f5f9; color: #64748b; }
+
+    /* Category badges */
+    .cat-badge { display: inline-block; border-radius: 4px; padding: 2px 8px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; }
+    .cat-factual    { background: #dbeafe; color: #1d4ed8; }
+    .cat-procedural { background: #d1fae5; color: #065f46; }
+    .cat-comparison { background: #fef3c7; color: #92400e; }
+    .cat-multi_hop  { background: #ede9fe; color: #5b21b6; }
+    .cat-exception  { background: #fee2e2; color: #991b1b; }
+
+    .change-badge { display: inline-block; border-radius: 4px; padding: 2px 8px; font-size: 0.72rem; font-weight: 700; }
+    .change-best  { background: #d1fae5; color: #065f46; }
+    .change-worse { background: #fee2e2; color: #991b1b; }
+    .change-same  { background: #f1f5f9; color: #64748b; }
+
+    /* Tables */
+    .section { margin-bottom: 32px; }
+    .table-scroll { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.07); font-size: 0.83rem; }
+    thead { background: #0c2340; color: #fff; }
+    thead th { padding: 11px 9px; text-align: center; font-weight: 600; font-size: 0.72rem; letter-spacing: 0.04em; text-transform: uppercase; }
+    thead th:first-child { text-align: left; padding-left: 14px; }
+    thead .r1-col  { background: #1e40af; }
+    thead .r2-col  { background: #92400e; }
+    thead .r3-col  { background: #5b21b6; }
+    thead .win-col { background: #1f2937; }
+    tbody tr { border-bottom: 1px solid #f1f5f9; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: #f8fafc; }
+    td { padding: 9px; vertical-align: middle; text-align: center; }
+    td:first-child { text-align: left; padding-left: 14px; font-weight: 500; }
+    .avg-row td { background: #eff6ff; font-weight: 700; border-top: 2px solid #bfdbfe; }
+
+    .id-cell { font-family: monospace; font-size: 0.78rem; color: #64748b; white-space: nowrap; }
+    .question-cell { font-size: 0.82rem; max-width: 260px; text-align: left !important; }
+
+    /* Verdict */
+    .verdict-box { background: #fff; border-radius: 12px; padding: 24px 28px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); margin-bottom: 32px; border-left: 5px solid #0f4c81; }
+    .verdict-box h3 { font-size: 1rem; font-weight: 700; color: #0f4c81; margin-bottom: 12px; }
+    .verdict-box p { font-size: 0.88rem; color: #374151; line-height: 1.7; margin-bottom: 8px; }
+    .verdict-box p:last-child { margin-bottom: 0; }
+
+    /* Insights */
+    .insights { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 32px; }
+    @media (max-width: 720px) { .insights { grid-template-columns: 1fr; } }
+    .insight-card { background: #fff; border-radius: 10px; padding: 20px 22px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
+    .insight-card h3 { font-size: 0.85rem; font-weight: 700; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+    .insight-card ul { padding-left: 18px; }
+    .insight-card li { font-size: 0.85rem; color: #374151; margin-bottom: 6px; line-height: 1.5; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+    .dot-green { background: #10b981; }
+    .dot-yellow { background: #f59e0b; }
+    .dot-red { background: #ef4444; }
+    .dot-purple { background: #8b5cf6; }
+
+    .footer { text-align: center; font-size: 0.78rem; color: #94a3b8; padding-top: 16px; border-top: 1px solid #e2e8f0; }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <h1>Northstar Digital Bank — Three-Way Retrieval Comparison</h1>
+    <div class="subtitle">chunk400 &nbsp;vs&nbsp; chunk200 &nbsp;vs&nbsp; chunk200 + cross-encoder reranking &nbsp;&mdash;&nbsp; 36 in-corpus, 8 OOD &nbsp;&mdash;&nbsp; judge: qwen2.5:7b</div>
+    <div class="exp-ids">
+      <span class="exp-id exp-id-r1">chunk400 &nbsp;&mdash;&nbsp; 2589578c</span>
+      <span class="exp-id exp-id-r2">chunk200 &nbsp;&mdash;&nbsp; 5811c36c</span>
+      <span class="exp-id exp-id-r3">chunk200+rerank10 &nbsp;&mdash;&nbsp; 6eff2246</span>
+    </div>
+  </div>
+
+  <!-- Config -->
+  <div class="section">
+    <h2>Configuration</h2>
+    <div class="config-compare">
+      <div class="config-panel r1">
+        <h3>Run 1 — chunk400 (baseline)</h3>
+        <div class="config-row"><span class="key">Chunk Size</span><span class="val">400 chars</span></div>
+        <div class="config-row"><span class="key">Chunk Overlap</span><span class="val">80 chars</span></div>
+        <div class="config-row"><span class="key">Chunks in DB</span><span class="val">42</span></div>
+        <div class="config-row"><span class="key">Fetch K</span><span class="val">3</span></div>
+        <div class="config-row"><span class="key">Reranker</span><span class="val">None</span></div>
+        <div class="config-row"><span class="key">Final K</span><span class="val">3</span></div>
+      </div>
+      <div class="config-panel r2">
+        <h3>Run 2 — chunk200</h3>
+        <div class="config-row changed"><span class="key">Chunk Size</span><span class="val">200 chars</span></div>
+        <div class="config-row changed"><span class="key">Chunk Overlap</span><span class="val">40 chars</span></div>
+        <div class="config-row changed"><span class="key">Chunks in DB</span><span class="val">102</span></div>
+        <div class="config-row"><span class="key">Fetch K</span><span class="val">3</span></div>
+        <div class="config-row"><span class="key">Reranker</span><span class="val">None</span></div>
+        <div class="config-row"><span class="key">Final K</span><span class="val">3</span></div>
+      </div>
+      <div class="config-panel r3">
+        <h3>Run 3 — chunk200 + rerank</h3>
+        <div class="config-row changed"><span class="key">Chunk Size</span><span class="val">200 chars</span></div>
+        <div class="config-row changed"><span class="key">Chunk Overlap</span><span class="val">40 chars</span></div>
+        <div class="config-row changed"><span class="key">Chunks in DB</span><span class="val">102</span></div>
+        <div class="config-row new"><span class="key">Fetch K</span><span class="val">10</span></div>
+        <div class="config-row new"><span class="key">Reranker</span><span class="val">ms-marco-MiniLM-L-6-v2</span></div>
+        <div class="config-row"><span class="key">Final K</span><span class="val">3</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Overall Metric Comparison -->
+  <div class="section">
+    <h2>Overall Metrics — 36 In-Corpus Questions</h2>
+    <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Metric</th>
+          <th class="r1-col">chunk400</th>
+          <th class="r2-col">chunk200</th>
+          <th class="r3-col">chunk200<br>+rerank</th>
+          <th class="win-col">Best</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Contextual Precision</td>
+          <td><span class="score score-high">0.88</span></td>
+          <td><span class="score score-high">0.94</span></td>
+          <td><span class="score score-high">0.83</span></td>
+          <td><span class="winner winner-r2">chunk200</span></td>
+        </tr>
+        <tr>
+          <td>Contextual Recall</td>
+          <td><span class="score score-high">0.97</span></td>
+          <td><span class="score score-high">0.93</span></td>
+          <td><span class="score score-high">0.88</span></td>
+          <td><span class="winner winner-r1">chunk400</span></td>
+        </tr>
+        <tr>
+          <td>Contextual Relevancy</td>
+          <td><span class="score score-low">0.24</span></td>
+          <td><span class="score score-mid">0.46</span></td>
+          <td><span class="score score-mid">0.40</span></td>
+          <td><span class="winner winner-r2">chunk200</span></td>
+        </tr>
+        <tr>
+          <td>Faithfulness</td>
+          <td><span class="score score-high">0.79</span></td>
+          <td><span class="score score-mid">0.67</span></td>
+          <td><span class="score score-high">0.70</span></td>
+          <td><span class="winner winner-r1">chunk400</span></td>
+        </tr>
+        <tr>
+          <td>Answer Relevancy</td>
+          <td><span class="score score-high">0.89</span></td>
+          <td><span class="score score-high">0.85</span></td>
+          <td><span class="score score-high">0.78</span></td>
+          <td><span class="winner winner-r1">chunk400</span></td>
+        </tr>
+        <tr>
+          <td>Hallucination</td>
+          <td><span class="score score-low">0.38</span></td>
+          <td><span class="score score-mid">0.53</span></td>
+          <td><span class="score score-mid">0.40</span></td>
+          <td><span class="winner winner-r2">chunk200</span></td>
+        </tr>
+        <tr>
+          <td>Correctness</td>
+          <td><span class="score score-high">0.83</span></td>
+          <td><span class="score score-high">0.82</span></td>
+          <td><span class="score score-high">0.76</span></td>
+          <td><span class="winner winner-r1">chunk400</span></td>
+        </tr>
+        <tr>
+          <td>Completeness</td>
+          <td><span class="score score-high">0.81</span></td>
+          <td><span class="score score-high">0.79</span></td>
+          <td><span class="score score-high">0.73</span></td>
+          <td><span class="winner winner-r1">chunk400</span></td>
+        </tr>
+        <tr>
+          <td>Abstention (OOD)</td>
+          <td><span class="score score-high">8/8</span></td>
+          <td><span class="score score-high">8/8</span></td>
+          <td><span class="score score-high">8/8</span></td>
+          <td><span class="winner winner-tie">Tie</span></td>
+        </tr>
+        <tr class="avg-row">
+          <td>Wins</td>
+          <td style="text-align:left;padding-left:10px;font-size:0.83rem;color:#1d4ed8;">4 metrics</td>
+          <td style="text-align:left;padding-left:10px;font-size:0.83rem;color:#92400e;">3 metrics</td>
+          <td style="text-align:left;padding-left:10px;font-size:0.83rem;color:#5b21b6;">0 metrics</td>
+          <td></td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+  <!-- Category Breakdown -->
+  <div class="section">
+    <h2>Category Breakdown — Contextual Relevancy &amp; Faithfulness</h2>
+    <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Category</th>
+          <th>Qs</th>
+          <th class="r1-col">Ctx Rel<br>400</th>
+          <th class="r2-col">Ctx Rel<br>200</th>
+          <th class="r3-col">Ctx Rel<br>rerank</th>
+          <th class="r1-col">Faith<br>400</th>
+          <th class="r2-col">Faith<br>200</th>
+          <th class="r3-col">Faith<br>rerank</th>
+          <th class="r1-col">Corr<br>400</th>
+          <th class="r2-col">Corr<br>200</th>
+          <th class="r3-col">Corr<br>rerank</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="cat-badge cat-factual">Factual</span></td>
+          <td>14</td>
+          <td><span class="score score-low">0.22</span></td>
+          <td><span class="score score-mid">0.43</span></td>
+          <td><span class="score score-low">0.37</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">0.71</span></td>
+          <td><span class="score score-high">0.71</span></td>
+          <td><span class="score score-high">0.94</span></td>
+          <td><span class="score score-high">0.87</span></td>
+          <td><span class="score score-high">0.80</span></td>
+        </tr>
+        <tr>
+          <td><span class="cat-badge cat-procedural">Procedural</span></td>
+          <td>7</td>
+          <td><span class="score score-low">0.23</span></td>
+          <td><span class="score score-mid">0.47</span></td>
+          <td><span class="score score-low">0.39</span></td>
+          <td><span class="score score-high">0.86</span></td>
+          <td><span class="score score-high">0.71</span></td>
+          <td><span class="score score-high">0.71</span></td>
+          <td><span class="score score-high">0.94</span></td>
+          <td><span class="score score-high">0.83</span></td>
+          <td><span class="score score-high">0.76</span></td>
+        </tr>
+        <tr>
+          <td><span class="cat-badge cat-comparison">Comparison</span></td>
+          <td>4</td>
+          <td><span class="score score-low">0.32</span></td>
+          <td><span class="score score-mid">0.46</span></td>
+          <td><span class="score score-mid">0.42</span></td>
+          <td><span class="score score-mid">0.67</span></td>
+          <td><span class="score score-mid">0.54</span></td>
+          <td><span class="score score-mid">0.67</span></td>
+          <td><span class="score score-mid">0.65</span></td>
+          <td><span class="score score-mid">0.65</span></td>
+          <td><span class="score score-mid">0.45</span></td>
+        </tr>
+        <tr>
+          <td><span class="cat-badge cat-multi_hop">Multi-Hop</span></td>
+          <td>8</td>
+          <td><span class="score score-low">0.27</span></td>
+          <td><span class="score score-mid">0.57</span></td>
+          <td><span class="score score-mid">0.47</span></td>
+          <td><span class="score score-mid">0.61</span></td>
+          <td><span class="score score-high">0.75</span></td>
+          <td><span class="score score-high">0.71</span></td>
+          <td><span class="score score-high">0.81</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+        </tr>
+        <tr>
+          <td><span class="cat-badge cat-exception">Exception</span></td>
+          <td>3</td>
+          <td><span class="score score-low">0.12</span></td>
+          <td><span class="score score-low">0.26</span></td>
+          <td><span class="score score-low">0.28</span></td>
+          <td><span class="score score-low">0.33</span></td>
+          <td><span class="score score-low">0.33</span></td>
+          <td><span class="score score-mid">0.67</span></td>
+          <td><span class="score score-low">0.33</span></td>
+          <td><span class="score score-low">0.33</span></td>
+          <td><span class="score score-low">0.33</span></td>
+        </tr>
+        <tr class="avg-row">
+          <td><strong>Overall</strong></td>
+          <td>36</td>
+          <td><span class="score score-low">0.24</span></td>
+          <td><span class="score score-mid">0.46</span></td>
+          <td><span class="score score-mid">0.40</span></td>
+          <td><span class="score score-high">0.79</span></td>
+          <td><span class="score score-mid">0.67</span></td>
+          <td><span class="score score-high">0.70</span></td>
+          <td><span class="score score-high">0.83</span></td>
+          <td><span class="score score-high">0.82</span></td>
+          <td><span class="score score-high">0.76</span></td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+  <!-- Notable per-question changes from reranking -->
+  <div class="section">
+    <h2>Reranking Impact — Notable Per-Question Changes</h2>
+    <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Question</th>
+          <th>Cat</th>
+          <th class="r2-col">Prec<br>200</th>
+          <th class="r3-col">Prec<br>rerank</th>
+          <th class="r2-col">Recall<br>200</th>
+          <th class="r3-col">Recall<br>rerank</th>
+          <th class="r2-col">Faith<br>200</th>
+          <th class="r3-col">Faith<br>rerank</th>
+          <th class="r2-col">Corr<br>200</th>
+          <th class="r3-col">Corr<br>rerank</th>
+          <th>Rerank effect</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Regressions caused by reranking -->
+        <tr>
+          <td class="id-cell">NSB-003</td>
+          <td class="question-cell">What is the standard daily limit for domestic wires?</td>
+          <td><span class="cat-badge cat-factual">factual</span></td>
+          <td><span class="score score-mid">0.50</span></td>
+          <td><span class="score score-low">0.33</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="change-badge change-worse">REGRESSED</span></td>
+        </tr>
+        <tr>
+          <td class="id-cell">NSB-026</td>
+          <td class="question-cell">Which exchange rate is used for daily-limit monitoring on a foreign-currency wire?</td>
+          <td><span class="cat-badge cat-multi_hop">multi_hop</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-high">0.70</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-high">0.93</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="change-badge change-worse">RETRIEVAL FAILED</span></td>
+        </tr>
+        <tr>
+          <td class="id-cell">NSB-017</td>
+          <td class="question-cell">Which has the higher standard daily limit: EFT or Interac Business Transfer?</td>
+          <td><span class="cat-badge cat-comparison">comparison</span></td>
+          <td><span class="score score-high">0.83</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-mid">0.50</span></td>
+          <td><span class="score score-mid">0.67</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="change-badge change-worse">REGRESSED</span></td>
+        </tr>
+        <tr>
+          <td class="id-cell">NSB-014</td>
+          <td class="question-cell">What happens when a payment is rejected under the approval workflow?</td>
+          <td><span class="cat-badge cat-procedural">procedural</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-mid">0.50</span></td>
+          <td><span class="change-badge change-worse">REGRESSED</span></td>
+        </tr>
+        <!-- Stable good -->
+        <tr>
+          <td class="id-cell">NSB-022</td>
+          <td class="question-cell">Can the same employee who created a payment under Dual Approval also approve it?</td>
+          <td><span class="cat-badge cat-multi_hop">multi_hop</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="change-badge change-best">STABLE FIX</span></td>
+        </tr>
+        <tr>
+          <td class="id-cell">NSB-031</td>
+          <td class="question-cell">Does a temporary EFT limit increase permanently change the standard limit?</td>
+          <td><span class="cat-badge cat-multi_hop">multi_hop</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="change-badge change-best">STABLE FIX</span></td>
+        </tr>
+        <!-- Still failing -->
+        <tr>
+          <td class="id-cell">NSB-033</td>
+          <td class="question-cell">What is the difference between a Viewer and a User?</td>
+          <td><span class="cat-badge cat-comparison">comparison</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="change-badge change-same">STILL FAILING</span></td>
+        </tr>
+        <tr>
+          <td class="id-cell">NSB-023</td>
+          <td class="question-cell">If an international wire is only CAD 5,000, can it use Single Approval?</td>
+          <td><span class="cat-badge cat-exception">exception</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-mid">0.50</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-high">1.00</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="score score-low">0.00</span></td>
+          <td><span class="change-badge change-same">STILL FAILING</span></td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+  <!-- Verdict -->
+  <div class="verdict-box">
+    <h3>Verdict — chunk200 (no reranking) remains the best overall configuration</h3>
+    <p><strong>Reranking with ms-marco-MiniLM-L-6-v2 did not improve results.</strong> The cross-encoder won zero metrics outright and introduced new retrieval failures that did not exist in chunk200 alone. NSB-003 (domestic wire limit) and NSB-026 (exchange rate monitoring) both went to prec=0.00, rec=0.00 after reranking — the reranker actively demoted the correct chunks.</p>
+    <p><strong>Why it failed:</strong> ms-marco-MiniLM-L-6-v2 is trained on MS MARCO, a web-search dataset. It learns to score relevance for short factual web queries, not banking policy lookups. When the question is "What is the standard daily limit for domestic wires?" it may score a chunk about international wires (which mentions "standard daily limits") higher than the domestic-wire chunk, because the vocabulary overlap with "standard daily limit" is similar. Domain mismatch is the likely root cause.</p>
+    <p><strong>What reranking did preserve:</strong> The multi-hop fixes from chunk200 (NSB-022, NSB-031) carried through — these questions benefit from focused 200-char chunks regardless of reranking. Multi-hop correctness remains at 1.00 in the rerank run.</p>
+    <p><strong>Next options:</strong> (1) Try a domain-tuned reranker or fine-tune ms-marco on a few banking examples. (2) Increase k from 3→5 in chunk200 without reranking to recover the recall lost vs chunk400. (3) Address NSB-033 and NSB-023/024 via metadata-filtered retrieval targeting §1.1 and §3.2 directly.</p>
+  </div>
+
+  <!-- Insights -->
+  <div class="section">
+    <h2>Analysis</h2>
+    <div class="insights">
+      <div class="insight-card">
+        <h3><span class="dot dot-yellow"></span> chunk200 is the current best</h3>
+        <ul>
+          <li>Wins on Ctx Precision (0.94), Ctx Relevancy (0.46), and Hallucination (0.53) — the three metrics most improved by tighter chunks.</li>
+          <li>Multi-hop correctness = 1.00 (same as rerank). NSB-022 and NSB-031 fixes are stable across both chunk200 configurations.</li>
+          <li>Faithfulness regression (0.79 → 0.67) is the main cost — 5 simple factual questions lose grounding when answers span chunk boundaries.</li>
+          <li><strong>Recommended next step:</strong> Try chunk200 with k=5 to recover the recall and faithfulness losses without sacrificing the relevancy gains.</li>
+        </ul>
+      </div>
+      <div class="insight-card">
+        <h3><span class="dot dot-red"></span> Why reranking hurt</h3>
+        <ul>
+          <li><strong>Domain mismatch:</strong> ms-marco-MiniLM-L-6-v2 is trained on web-search data. Banking policy language ("standard daily limit", "Dual Approval threshold") does not match the query-document patterns the model learned.</li>
+          <li><strong>New retrieval failures:</strong> NSB-003 and NSB-026 went from working to complete failure (prec=0.00, rec=0.00). The reranker pushed the correct chunks out of the top 3.</li>
+          <li><strong>False precision:</strong> The reranker sometimes scores high on surface-level keyword overlap rather than semantic relevance — e.g. a chunk mentioning both "wire" and "daily limit" outscores the chunk that actually states the domestic wire limit.</li>
+          <li>Reranking can work well, but requires either a domain-tuned model or a larger candidate pool (k=20+) so the correct chunk is unlikely to be dropped.</li>
+        </ul>
+      </div>
+      <div class="insight-card">
+        <h3><span class="dot dot-purple"></span> Persistent failures (all 3 runs)</h3>
+        <ul>
+          <li><strong>NSB-033</strong> (Viewer vs User): prec=0.00, rec=0.00 in all three runs. The role-definition text for Viewer and User share near-identical embedding vectors — the retriever consistently fails to surface §1.1.</li>
+          <li><strong>NSB-023/024</strong> (Exception policy): Retrieval is now correct in the rerank run (NSB-023 faith=1.00 in rerank!), but correctness remains 0.00 — the model retrieves the right chunk but still gives the wrong answer. This is a generation/prompt problem, not retrieval.</li>
+          <li>These require targeted fixes: metadata routing for NSB-033, and a negative-constraint prompt instruction for NSB-023/024 ("if the rule says 'always', no amount-based exception applies").</li>
+        </ul>
+      </div>
+      <div class="insight-card">
+        <h3><span class="dot dot-green"></span> Recommended next experiments</h3>
+        <ul>
+          <li><strong>chunk200, k=5</strong> — most likely to recover faithfulness losses while keeping relevancy gains. Low effort, no new dependencies.</li>
+          <li><strong>Semantic / sentence-boundary chunking</strong> — eliminates the chunk-boundary faithfulness issue by splitting on natural sentence breaks rather than fixed char counts.</li>
+          <li><strong>Domain-tuned reranker</strong> — fine-tune ms-marco on (question, passage) pairs from the Northstar golden set. Even 36 examples may help. Higher effort but addresses the root cause of reranking failure.</li>
+          <li><strong>Prompt fix for exception questions</strong> — add an explicit instruction: "If the handbook states a rule applies 'regardless of amount' or 'always', treat it as an absolute constraint with no exceptions."</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    Northstar Digital Bank RAG Evaluation &mdash; 3-way comparison: chunk400 vs chunk200 vs chunk200+rerank10 &mdash; 2026-09-01 &mdash; judge: qwen2.5:7b (Ollama)
+  </div>
+
+</div>
+</body>
+</html>
