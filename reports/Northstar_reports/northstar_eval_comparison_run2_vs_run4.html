@@ -364,20 +364,17 @@
           <td class="id-cell">NSB-034</td>
           <td class="question-cell">A user is disabled while logged in &mdash; what happens to their active session?</td>
           <td><span class="cat-badge cat-procedural">procedural</span></td>
-          <td><span class="score score-low">0.00</span></td>
-          <td><span class="score score-low">0.00</span></td>
-          <td><span class="score score-low">0.00</span></td>
-          <td><span class="score score-low">0.00</span></td>
-          <td><span class="score score-low">0.00</span></td>
-          <td><span class="score score-low">0.00</span></td>
-          <td><span class="score score-low">0.00</span></td>
-          <td><span class="score score-low">0.00</span></td>
-          <td><span class="change-badge change-same">INVESTIGATE</span></td>
+          <td colspan="8" style="font-size:0.8rem;color:#94a3b8;padding:8px 12px;">
+            <em>Run 4 scores: all 0.00 (retrieval bug — see below)</em><br>
+            <strong style="color:#4ade80;">Post-patch:</strong> multi-query guard added; retrieval now correctly fetches section 8.2.
+            Validated answer: <em>"Within five minutes."</em> &mdash; formal metric re-run pending.
+          </td>
+          <td><span class="change-badge change-win">FIXED</span></td>
         </tr>
       </tbody>
     </table>
     </div>
-    <p style="font-size:0.78rem;color:#94a3b8;margin-top:8px;">NSB-023: AR=0.00 is a known judge artifact (see fix notes above). NSB-034: all-zero scores across every metric are highly suspicious for a factual question with a clear handbook answer &mdash; likely an evaluation infrastructure failure rather than a pipeline failure.</p>
+    <p style="font-size:0.78rem;color:#94a3b8;margin-top:8px;">NSB-023: AR=0.00 is a known judge artifact (see fix notes above). NSB-034: all-zero scores in Run 4 were caused by multi-query retrieval over-triggering — the question mentions "user" and "administrator", both role terms, so retrieval fetched role-definition chunks (section 1.1) instead of the session-control policy (section 8.2). Root cause identified and patched: multi-query now requires explicit comparison language ("difference", "compare", "versus") to trigger. Post-patch validated answer: "Within five minutes."</p>
   </div>
 
   <!-- Verdict -->
@@ -386,7 +383,7 @@
     <p><strong>Run 4 wins on reference-based accuracy:</strong> Correctness improved +0.05 (0.82 &rarr; 0.87), Completeness improved +0.07 (0.79 &rarr; 0.86), and Faithfulness improved +0.04 (0.67 &rarr; 0.71). The two persistent exception failures (NSB-023, NSB-024) are now fully resolved with correctness=1.00 each.</p>
     <p><strong>Run 2 holds an advantage on hallucination and precision:</strong> Hallucination score dropped from 0.53 &rarr; 0.44 in Run 4, and Contextual Precision fell by 0.05. The model stayed closer to the literal retrieved context when given a simpler prompt.</p>
     <p><strong>The core tradeoff:</strong> Prompt v2 makes the model smarter at applying policy rules (universal-rule inference, exception detection) but slightly less conservative about staying strictly within the retrieved text. Instructions that say "infer from universal rules" push the model to go beyond the literal context &mdash; which improves correctness but increases inferred claims the hallucination metric penalises.</p>
-    <p><strong>NSB-034 all-zero scores require investigation:</strong> A clear factual question scoring 0 across all 8 metrics in Run 4 is most likely an evaluation infrastructure failure. Re-running NSB-034 in isolation is recommended before drawing any conclusions about that question.</p>
+    <p><strong>NSB-034 root cause identified and fixed:</strong> All-zero scores in Run 4 were caused by multi-query retrieval over-triggering. The question mentions "user" and "administrator" — both tracked as role terms — so the retriever fetched role-definition chunks (section 1.1) instead of the session-control policy (section 8.2). The model abstained because the relevant fact was never in the context. Fix: multi-query retrieval now requires explicit comparison language in addition to two role names. Post-patch validation confirms the correct answer: <em>"Within five minutes."</em></p>
     <div class="recommendation">For a banking policy assistant, correctness and completeness matter most. Run 4 is the recommended configuration.</div>
   </div>
 
@@ -407,8 +404,8 @@
         <p>Prompt v2 improved faithfulness (+0.04) but worsened hallucination (&minus;0.09). This is not a contradiction: faithfulness measures whether claims are supported by the retrieved context, while hallucination measures whether the model introduces statements not literally present. Instructions that say "infer from universal rules" push the model to generate correct logical conclusions that go slightly beyond the literal text — raising both faithfulness (the inference chain is sound) and the hallucination penalty (the conclusion is inferred, not quoted).</p>
       </div>
       <div class="insight-card">
-        <h3><span class="dot dot-blue"></span> NSB-034 all-zero scores warrant investigation</h3>
-        <p>A question with a clear answer in the handbook scored 0 across all 8 metrics in Run 4. This is highly suspicious: correctness=0.00, faithfulness=0.00, and answer relevancy=0.00 simultaneously suggests the evaluation itself failed rather than the pipeline. Possible causes: judge timeout, malformed output from qwen2.5:7b on this specific question, or a framework exception that silently zeroed scores. Recommended action: re-run NSB-034 in isolation before treating it as a genuine regression.</p>
+        <h3><span class="dot dot-green"></span> NSB-034 root cause found and fixed</h3>
+        <p>All-zero scores were not a judge failure — they were a retrieval bug introduced by the multi-query strategy. The question mentions "user" and "administrator", both role terms, so <code>_get_contexts()</code> ran per-role queries and fetched role-definition chunks (section 1.1) instead of the session policy (section 8.2). The model never saw the "five minutes" fact and correctly abstained. Fix: multi-query now requires explicit comparison language ("difference", "compare", "versus") alongside two role names before triggering. Re-running NSB-034 in isolation post-patch returned the correct answer: <em>"Within five minutes."</em> This is a good example of a retrieval bug masquerading as a generation failure — the all-zero pattern across every metric was the diagnostic clue.</p>
       </div>
     </div>
   </div>
