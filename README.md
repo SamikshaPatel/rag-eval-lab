@@ -342,6 +342,9 @@ Each day links to a run report or comparison where one exists so you can see rea
    the LangSmith UI — this is how you track score changes across code iterations.
    → *See [`reports/Zephyr_reports/run1_eval_k3_chunk400_llama31_ollama.html`](reports/Zephyr_reports/run1_eval_k3_chunk400_llama31_ollama.html) through [`run4_eval_k3_chunk400_qwen25_ollama.html`](reports/Zephyr_reports/run4_eval_k3_chunk400_qwen25_ollama.html) — four runs tracking score evolution across chunk-size and judge-model changes.*
    → Screenshot: [`docs/screenshots/1_langsmith_northstar_experiment_comparison.png`](docs/screenshots/1_langsmith_northstar_experiment_comparison.png) — LangSmith experiment comparison view (Northstar; Zephyr view follows the same layout)
+   → Screenshot: [`docs/screenshots/3_langsmith_zephyr_experiment_Per-QuestionFeedbackScore.png`](docs/screenshots/3_langsmith_zephyr_experiment_Per-QuestionFeedbackScore.png) — per-question feedback scores for the Zephyr corpus
+   → Screenshot: [`docs/screenshots/3_langsmith_northstar_experiment_Per-QuestionFeedbackScore.png`](docs/screenshots/3_langsmith_northstar_experiment_Per-QuestionFeedbackScore.png) — per-question feedback scores for the Northstar corpus
+   → Screenshot: [`docs/screenshots/4_langsmith_online_evaluator_config.png`](docs/screenshots/4_langsmith_online_evaluator_config.png) — LangSmith online evaluator configuration (Answer Relevancy, set up in the UI)
 
 9. **Day 9** — Edit a prompt in `prompts/` (e.g. tighten the grounding
    instruction), re-run `eval_langsmith.py`, and compare scores. You have now
