@@ -85,3 +85,8 @@ USE_LOCAL_JUDGE=1 python3 src/eval_langsmith_northstar.py  # run 44-question Nor
 **Rate limit tip:** All three eval scripts share the same Gemini free-tier
 quota (20 req/day). If you hit the limit, add `USE_LOCAL_JUDGE=1` to `.env`
 and re-run — all scripts will switch to the local Ollama judge automatically.
+
+---
+
+For a full step-by-step walkthrough with expected outputs and baseline results
+for each step, see **[RUNBOOK.md](RUNBOOK.md)**.

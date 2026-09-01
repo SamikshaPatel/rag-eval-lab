@@ -1,8 +1,9 @@
 # Execution Runbook
 
 Step-by-step guide to running the RAG Evaluation Lab from scratch. Each step
-states its **purpose**, exact **action**, **expected output**, and how to
-**evaluate / verify** success.
+states its **purpose**, exact **action**, **expected output**, how to
+**evaluate / verify** success, and **baseline results** from a real run on
+this codebase — so you know whether your output is correct.
 
 Work through steps in order — each depends on the one before it. Steps 10, 11,
 and 13 are performed in the LangSmith web UI (no code required).
@@ -153,7 +154,7 @@ echo $LANGSMITH_API_KEY     # should print your key (not blank)
 
 ---
 
-## Stage 1 — Build the Vector Store
+## Step 5 — Build the Vector Store
 
 **Purpose:** Chunk the handbook into searchable pieces, embed each chunk, and
 save to ChromaDB on disk. This is the "index" that all retrieval steps search
@@ -189,13 +190,25 @@ ls chroma_db_zephyr/
 Check Steps 1 and 2.
 
 **Tuning experiment (try later):** Change `CHUNK_SIZE = 400` to `CHUNK_SIZE = 100`
-in `rag_chain.py` (single source of truth for chunk params), re-run `ingest_zephyr.py`,
-then re-run `rag_chain.py` on the same question. Answer quality typically drops —
-this demonstrates chunk size as a tunable variable. Reset to 400 when done.
+in `src/config.py` (single source of truth for all parameters), re-run
+`ingest_zephyr.py`, then re-run `rag_chain.py` on the same question. Answer
+quality typically drops — this demonstrates chunk size as a tunable variable.
+Reset to 400 when done.
+
+### Baseline results
+
+```
+Loaded 1 document(s), 2478 characters.
+Split into 9 chunks.
+Embedded and stored 9 chunks in ./chroma_db_zephyr.
+Ingestion complete. You can now run src/rag_chain.py
+```
+
+✅ **PASS** — 9 chunks, `chroma_db_zephyr/` contains `chroma.sqlite3` and a UUID folder.
 
 ---
 
-## Stage 2 — Test the RAG Pipeline
+## Step 6 — Test the RAG Pipeline
 
 **Purpose:** Manually verify the end-to-end RAG pipeline before running
 automated evaluations. Builds intuition for what retrieval + generation looks
@@ -241,9 +254,66 @@ Below each answer the script prints the 3 retrieved chunks the model was given.
 
 This trace view is the most important debugging tool in RAG systems.
 
+### Baseline results — in-corpus questions
+
+| Question | Expected answer | Status |
+|----------|----------------|--------|
+| Pro plan cost? | `$49 per seat per month` | ✅ PASS |
+| API rate limit on Pro? | `1,000 requests per minute` | ✅ PASS |
+
+### Baseline results — hallucination test
+
+```
+Q: What is the capital of France?
+A: I don't know based on the handbook.
+
+--- retrieved context (what the model was allowed to see) ---
+[1] ## About Zephyr ...
+[2] # Zephyr Analytics — Product Handbook ...
+[3] ## The Pulse Feature ...
+```
+
+✅ **PASS** — grounding holds; model does not use training knowledge for out-of-corpus questions.
+
+**Why this matters:** The grounding prompt in `rag_chain.py` is the only
+defence against the model using its own training knowledge. If this test fails,
+the prompt is broken and every eval metric becomes meaningless.
+
+### Known issue — Pulse retrieval gap
+
+```bash
+python3 src/rag_chain.py "Which plans include the Pulse feature?"
+```
+
+**Expected answer:** `Pulse is available on the Pro and Enterprise plans only.`
+
+**Actual output:**
+```
+Q: Which plans include the Pulse feature?
+A: The Free plan does not include the Pulse feature.
+   I don't know based on the handbook.
+
+--- retrieved context ---
+[1] ## Plans and Limits   ← mentions Free plan excludes Pulse
+[2] The Enterprise plan includes ...
+[3] ## Data Export ...
+```
+
+⚠️ **KNOWN FAIL — retrieval gap.** Embedding similarity favours the
+`## Plans and Limits` chunk (mentions Pulse in the context of all plans) over
+the `## The Pulse Feature` chunk (states availability directly). The model
+cannot infer the positive from the negative with the chunks it receives.
+
+**Fix options:**
+- Raise `k` from 3 → 5 in `src/config.py` to fetch more chunks
+- Re-chunk with smaller overlap so the Pulse Feature section is isolated in its
+  own chunk
+
+This failure appears in the eval metrics at Steps 8 and 9 — it is expected and documented.
+
 ---
 
-## Stage 3 — Test the Agent
+## Step 7 — Test the Agent
 
 **Purpose:** Verify the LangGraph ReAct agent correctly routes questions to the
 right tool, including multi-step reasoning that combines retrieval and
@@ -281,6 +351,17 @@ For the third (multi-step) question, the agent must:
 LangGraphDeprecatedSinceV10: create_react_agent has been moved to langchain.agents.
 ```
 This deprecation warning does not affect correctness.
+
+### Baseline results
+
+| Question | Tool(s) called | Expected answer | Status |
+|----------|---------------|----------------|--------|
+| API rate limit? | `search_handbook` | 1,000 requests/minute | ✅ PASS |
+| What is 2 + 2? | `calculator` | 4 | ✅ PASS |
+| 90 days retention cost? | `search_handbook` → `calculator` | $45.00 | ✅ PASS |
+
+Both `search_handbook` and `calculator` confirmed as separate tool call nodes
+in the LangSmith agent trace for the multi-step question.
 
 ---
 
@@ -333,7 +414,7 @@ Abstention (no hallucination): 2/2 = 100%
 - `Retrieval hit rate = Keyword correctness` but LLM-judge fails → judge
   disagrees with the keyword check; check the judge prompt
 - The "Pulse" question (`Which plans include the Pulse feature?`) is an
-  expected FAIL — documented as a known retrieval gap in TEST_RUNBOOK TR-04
+  expected FAIL — retrieval gap documented in Step 6
 
 **LangSmith traces:** Each of the 8 questions creates a trace in the
 `rag-eval-lab` project. You can inspect which chunks each question retrieved
@@ -343,11 +424,41 @@ without changing any code.
 `eval_custom.py` and re-run. If the LLM-judge score shifts between runs, you
 have observed why a single eval run is not enough to trust.
 
+### Baseline results
+
+```
+===== RUN 1 of 1 =====
+[in ] retrieval=Y keyword=Y judge=Y :: How many dashboards does the Free plan include?
+[in ] retrieval=Y keyword=Y judge=Y :: How much does the Pro plan cost per seat per month?
+[in ] retrieval=Y keyword=N judge=N :: Which plans include the Pulse feature?
+[in ] retrieval=Y keyword=Y judge=Y :: What is the API rate limit on the Pro plan?
+[in ] retrieval=Y keyword=Y judge=Y :: How long is data retained on the Free plan?
+[in ] retrieval=Y keyword=Y judge=Y :: In which cities does Zephyr run its data centres?
+[out] abstention=Y (OK) :: What is Zephyr Analytics' stock price?
+[out] abstention=Y (OK) :: Who is the CEO of Zephyr Analytics?
+
+===== SUMMARY =====
+Retrieval hit rate : 6/6 = 100%
+Keyword correctness: 5/6 = 83%
+LLM-judge faithful : 5/6 = 83%
+Abstention (no hallucination): 2/2 = 100%
+```
+
+| Metric | Score | Status |
+|--------|-------|--------|
+| Retrieval hit rate | 6/6 = 100% | ✅ |
+| Keyword correctness | 5/6 = 83% | ✅ (1 known gap — Pulse question) |
+| LLM-judge faithful | 5/6 = 83% | ✅ (1 known gap — Pulse question) |
+| Abstention | 2/2 = 100% | ✅ |
+
+The consistent FAIL is "Which plans include the Pulse feature?" — retrieval gap
+documented in Step 6. All other questions PASS across all metrics.
+
 ---
 
 ## Step 9 — DeepEval: Baseline Run with Local Judge
 
-**Purpose:** Run DeepEval's four RAG metrics using the local `llama3.1:8b`
+**Purpose:** Run DeepEval's four RAG metrics using the local `qwen2.5:7b`
 model as judge (free, no quota). This is your baseline — you will compare it
 against the Gemini-judged run in Step 12 to understand how much judge quality
 affects scores.
@@ -396,12 +507,80 @@ Abstention (no hallucination): 2/2 = 100%
   facts; this is the primary problem (root cause: k=3 may not fetch enough chunks)
 - **Faithfulness ≈ 0.58** — local model adds embellishments beyond the context;
   expect Gemini judge to score this metric differently in Step 12
-- **Record these numbers** in TEST_RUNBOOK TR-07 — you will compare them
-  against the Gemini run in Step 12
+- Compare these numbers against your Step 12 (Gemini) run to understand how
+  judge quality affects scores
 
 **Note on local judge quality:** `qwen2.5:7b` is a capable local judge but weaker than Gemini.
 It may evaluate faithfulness inconsistently. Steps 10–13 use LangSmith to get
 authoritative, Gemini-judged scores.
+
+### Baseline results
+
+Per-question breakdown (local judge — `qwen2.5:7b`):
+
+```
+[out] abstention=Y (OK) :: What is Zephyr Analytics' stock price?
+[out] abstention=Y (OK) :: Who is the CEO of Zephyr Analytics?
+
+[FAIL] How many dashboards does the Free plan include?
+       ✓ Faithfulness                 1.00
+       ✓ Answer Relevancy             1.00
+       ✗ Contextual Recall            0.50
+       ✓ Contextual Precision         0.83
+
+[FAIL] How much does the Pro plan cost per seat per month?
+       ✗ Faithfulness                 0.50
+       ✓ Answer Relevancy             1.00
+       ✗ Contextual Recall            0.50
+       ✓ Contextual Precision         0.83
+
+[FAIL] Which plans include the Pulse feature?
+       ✓ Faithfulness                 1.00
+       ✗ Answer Relevancy             0.50
+       ✗ Contextual Recall            0.50
+       ✓ Contextual Precision         0.83
+
+[FAIL] What is the API rate limit on the Pro plan?
+       ✗ Faithfulness                 0.00
+       ✓ Answer Relevancy             1.00
+       ✗ Contextual Recall            0.50
+       ✓ Contextual Precision         0.83
+
+[FAIL] How long is data retained on the Free plan?
+       ✗ Faithfulness                 0.50
+       ✓ Answer Relevancy             1.00
+       ✗ Contextual Recall            0.57
+       ✓ Contextual Precision         0.83
+
+[FAIL] In which cities does Zephyr run its data centres?
+       ✗ Faithfulness                 0.50
+       ✗ Answer Relevancy             0.50
+       ✗ Contextual Recall            0.50
+       ✓ Contextual Precision         0.83
+```
+
+Aggregate summary:
+
+| Metric | Avg score | Pass rate | Threshold | Status |
+|--------|-----------|-----------|-----------|--------|
+| Faithfulness | 0.58 | 2/6 | 0.7 | ⚠ Below threshold |
+| Answer Relevancy | 0.83 | 4/6 | 0.7 | ⚠ 2 questions miss |
+| Contextual Recall | 0.51 | 0/6 | 0.7 | ❌ Consistent gap |
+| Contextual Precision | 0.83 | 6/6 | 0.7 | ✅ |
+| Abstention | 2/2 = 100% | — | — | ✅ |
+
+What these numbers reveal:
+
+| Finding | Implication |
+|---------|-------------|
+| Contextual Precision 0.83 across all questions | Retriever fetches relevant chunks — no noise problem |
+| Contextual Recall 0.51 across all questions | Retriever consistently misses some needed facts — primary bottleneck |
+| Faithfulness 0.58 | Local judge is weaker than Gemini; expect this number to shift in Step 12 |
+| Abstention 100% | Grounding holds — no hallucinations on out-of-corpus questions |
+
+**Root cause of low Contextual Recall:** k=3 chunks may not cover all facts
+needed for a complete answer. Raising `k` from 3 → 5 in `src/config.py` is
+the first fix to try.
 
 ---
 
@@ -442,6 +621,15 @@ https://smith.langchain.com.
 can now be run as a separate "Experiment" against this dataset and compared side
 by side in the LangSmith Experiments tab — no extra code required.
 
+### Baseline results
+
+Dataset `zephyr-golden-qa` created programmatically via `eval_langsmith.py`
+(Step 14 creates it automatically — you can skip the manual UI steps above if
+you run Step 14 first). 8 examples confirmed. Inputs: `question` + `in_corpus`;
+outputs: `reference` + `must_contain`.
+
+✅ **PASS**
+
 ---
 
 ## Step 11 — LangSmith UI: Set Up Online Evaluators
@@ -475,13 +663,14 @@ settings).
    - **Model:** select a Gemini model (e.g. Gemini 2.0 Flash)
    - **Response Format field:** `score`
    - **Sampling rate:** 100% (score every trace)
-   - **Note:Map the Question to the input field (based on Dataset Config) and the Answer to the reference output field (based on Dataset Config)and score to the Score field from Feedback configuration.**
+   - **Note:** Map the Question to the input field and the Answer to the
+     reference output field based on Dataset Config; map score to the Score
+     field from Feedback configuration.
 5. Click **Save**
 
 **Field mapping in the evaluator UI:**
 
-After the code change in `rag_chain.py` (commit: "Add @traceable wrapper"),
-each run creates a span named **`rag-answer`** with:
+Each run creates a span named **`rag-answer`** with:
 - **Input:** `{"question": "How much does the Pro plan cost?", "k": 3}`
 - **Output:** `"The Pro plan costs $49 per seat per month."` (plain string)
 
@@ -490,19 +679,25 @@ In the evaluator field mapping dialog, select:
 - `{output}` → **Run Output** (the plain string — no nested key to navigate)
 
 **Evaluate / Verify:**
-- Both evaluators appear in the Rules/Automations tab with status **Active**
+- Evaluator appears in the Rules/Automations tab with status **Active**
 - Run one manual question to trigger a trace:
   ```bash
   python3 src/rag_chain.py "How much does the Pro plan cost?"
   ```
 - Go to **Projects** → **rag-eval-lab** → **Traces**
-- Look for a trace named **`rag-answer`** (not `RunnableSequence`)
+- Look for a trace named **`rag-answer`**
 - Open it → scroll to the **Feedback** or **Scores** section
-- Within ~30 seconds you should see `Faithfulness` and `Answer Relevancy`
-  scores populated by the evaluators
+- Within ~30 seconds you should see the `Answer Relevancy` score populated
 
 **If scores don't appear:** Check that the evaluator is set to **Active** and
 that your Gemini credentials are connected in LangSmith settings.
+
+### Baseline results
+
+Online evaluator configured and set to Active. Answer Relevancy scores appear
+within ~30 seconds of each trace. UI-only step — no numeric output to record.
+
+✅ **PASS**
 
 ---
 
@@ -538,14 +733,13 @@ Abstention (no hallucination): 2/2 = 100%
 ```
 
 **Evaluate / Verify:**
-1. Record the summary scores in TEST_RUNBOOK TR-10
-2. Compare each metric against the Step 9 (local judge) results:
+1. Compare each metric against the Step 9 (local judge) results:
    - **Faithfulness:** expect Gemini to score differently from local — a large
      gap means local judge is unreliable for this metric
    - **Contextual Precision:** expect similar results — this metric is more
      objective and less sensitive to judge quality
    - **Contextual Recall:** may shift — Gemini understands nuanced gaps better
-3. Go to LangSmith → **Projects** → **rag-eval-lab** → **Traces** — the 6
+2. Go to LangSmith → **Projects** → **rag-eval-lab** → **Traces** — the 6
    in-corpus questions each created a new trace; the online evaluators from
    Step 11 score them automatically
 
@@ -554,6 +748,36 @@ Abstention (no hallucination): 2/2 = 100%
 ResourceExhausted: 429 Resource has been exhausted
 ```
 Set `USE_LOCAL_JUDGE=1` temporarily and try again tomorrow for the Gemini run.
+
+### Record your results
+
+Fill in after running:
+
+Per-question breakdown:
+```
+[fill in after run]
+```
+
+| Metric | Avg score | Pass rate | Threshold | Status |
+|--------|-----------|-----------|-----------|--------|
+| Faithfulness | — | — | 0.7 | — |
+| Answer Relevancy | — | — | 0.7 | — |
+| Contextual Recall | — | — | 0.7 | — |
+| Contextual Precision | — | — | 0.7 | — |
+| Abstention | — | — | — | — |
+
+Judge comparison against Step 9 baseline:
+
+| Metric | Local judge (qwen2.5:7b) | Gemini judge | Delta | What this means |
+|--------|--------------------------|--------------|-------|----------------|
+| Faithfulness | 0.58 | — | — | — |
+| Answer Relevancy | 0.83 | — | — | — |
+| Contextual Recall | 0.51 | — | — | — |
+| Contextual Precision | 0.83 | — | — | — |
+
+A large delta on Faithfulness means the local model is an unreliable judge for
+that metric. Similar Contextual Precision scores across both judges means the
+metric is robust to judge quality.
 
 ---
 
@@ -578,7 +802,7 @@ pipeline problems vs. judge quality problems.
 
 | Thing to check | What it means |
 |---------------|---------------|
-| "Pulse" question scores low in both runs | Real pipeline problem — retrieval gap (see TEST_RUNBOOK TR-04) |
+| "Pulse" question scores low in both runs | Real pipeline problem — retrieval gap (Step 6 known issue) |
 | Faithfulness differs significantly between runs | Judge quality is the variable, not the pipeline |
 | Contextual Precision similar in both runs | This metric is objective; good signal regardless of judge |
 | A question passes in one run but fails in the other | Local judge is unreliable for that metric |
@@ -592,6 +816,22 @@ pipeline problems vs. judge quality problems.
 higher-quality judge (Gemini) is more likely correct. The comparison tells you
 which metrics to trust from the local-judge run and which required a stronger judge
 to evaluate reliably.
+
+### Record your results
+
+Fill in after running the comparison:
+
+| Question | Local Faithfulness | Gemini Faithfulness | Local Recall | Gemini Recall |
+|----------|-------------------|---------------------|--------------|---------------|
+| Dashboards (Free plan) | — | — | — | — |
+| Pro plan cost | — | — | — | — |
+| Pulse feature | — | — | — | — |
+| API rate limit | — | — | — | — |
+| Data retention | — | — | — | — |
+| Data centres | — | — | — | — |
+
+Questions where both judges agree on pass/fail = reliable signal.
+Questions where judges disagree = judge quality is a variable, not the pipeline.
 
 ---
 
@@ -637,6 +877,19 @@ https://smith.langchain.com/o/.../datasets/.../compare?selectedSessions=...
 
 **Note:** Dataset creation is idempotent — if `zephyr-golden-qa` already exists
 in LangSmith, the script reuses it. Only the experiment (the run) is new each time.
+
+**Note on terminal output:** In some LangSmith SDK versions, the terminal summary
+is blank after the run completes — scores are fully recorded in the LangSmith UI
+regardless.
+
+### Baseline results
+
+- Dataset `zephyr-golden-qa` created with 8 examples
+- Experiment `golden-eval-0c49b171` created — 8 questions, ~5 min (local judge)
+- First run (`golden-eval-5f033d56`) hit Gemini quota mid-run (partial scores);
+  second run with local judge completed cleanly
+
+✅ **PASS**
 
 ---
 
@@ -684,6 +937,15 @@ Scores available in LangSmith:
   LangSmith → **Projects** → **rag-eval-lab** → **Rules / Automations**
 - Check that it is configured to fire on traces in the correct project
 
+### Baseline results
+
+- Dataset `zephyr-golden-qa` reused (8 examples)
+- Experiment `golden-answer-relevancy-a43ad2b2` created — 8 questions, ~19 sec
+- Traces available for online evaluator to score asynchronously
+
+✅ **PASS** — pipeline run complete; Answer Relevancy scores populate in
+LangSmith within ~30–60 seconds of run completion.
+
 ---
 
 ## Step 16 — RAGAS Evaluation (Optional / Cross-Validation)
@@ -715,6 +977,25 @@ context_recall: X.XX
 
 **If you see `NaN`:** Gemini quota is exhausted. Set `USE_LOCAL_JUDGE=1` in
 `.env` or wait for the quota to reset.
+
+**Framework divergence reference:** The `reports/Zephyr_reports/zephyr_framework_comparison_ragas_vs_deepeval.html`
+report documents a real RAGAS vs DeepEval run on the same 6 Zephyr questions
+with root-cause analysis for each divergence — open it to understand how the
+frameworks differ before drawing conclusions from your own run.
+
+### Record your results
+
+Fill in after running, then compare against the DeepEval local-judge scores from Step 9:
+
+| Metric | DeepEval local judge (Step 9) | DeepEval Gemini (Step 12) | RAGAS | RAGAS vs DeepEval delta |
+|--------|-------------------------------|---------------------------|-------|------------------------|
+| Faithfulness | 0.58 | — | — | — |
+| Answer Relevancy | 0.83 | — | — | — |
+| Context Precision | 0.83 | — | — | — |
+| Context Recall | 0.51 | — | — | — |
+
+Agreement within 0.10 = both frameworks measure the same thing consistently.
+Disagreement > 0.15 = investigate framework differences before trusting either score.
 
 ---
 

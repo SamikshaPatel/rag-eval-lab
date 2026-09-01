@@ -77,8 +77,7 @@ rag-eval-lab/
 ├── .env.example                 # Template for .env
 ├── requirements.txt
 ├── CLAUDE.md                    # Instructions for Claude Code
-├── RUNBOOK.md                   # Step-by-step operational guide
-├── TEST_RUNBOOK.md              # Test execution record with expected outputs
+├── RUNBOOK.md                   # Step-by-step operational guide with expected results and baselines
 └── README.md                    # This file
 ```
 
@@ -356,5 +355,5 @@ concrete. Everything else in AI testing is a variation on what you do here.
 
 ---
 
-*All facts about "Zephyr Analytics" are fictional by design — it forces the
+*All facts about "Zephyr Analytics"  and "Northstar Digital Bank" are fictional by design — it forces the
 model to rely on retrieval, so you can actually catch it hallucinating.*
