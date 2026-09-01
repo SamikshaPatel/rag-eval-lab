@@ -29,13 +29,13 @@ import json
 import os
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_ollama import ChatOllama
-from config import JUDGE_MODEL, LOCAL_JUDGE_MODEL, REPEATS, PROMPT_JUDGE_FAITHFULNESS, _load_prompt
+from config import JUDGE_MODEL, LOCAL_JUDGE_MODEL, REPEATS, PROMPT_JUDGE_FAITHFULNESS, ZEPHYR_GOLDEN_PATH, _load_prompt
 from judgeUtil import ABSTENTION_MARKERS
 from rag_chain import answer_with_context
 
 
 def load_golden():
-    with open("eval/golden_qa.json") as f:
+    with open(ZEPHYR_GOLDEN_PATH) as f:
         return json.load(f)
 
 

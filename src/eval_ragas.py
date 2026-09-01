@@ -30,7 +30,7 @@ from langchain_ollama import OllamaEmbeddings
 import os
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_ollama import ChatOllama
-from config import JUDGE_MODEL, LOCAL_JUDGE_MODEL, EMBED_MODEL
+from config import JUDGE_MODEL, LOCAL_JUDGE_MODEL, EMBED_MODEL, ZEPHYR_GOLDEN_PATH
 from rag_chain import answer_with_context
 
 # RAGAS 0.2.x imports. If these fail, check `pip show ragas` — the API changed
@@ -50,7 +50,7 @@ from ragas.run_config import RunConfig
 def build_dataset():
     """Run our RAG pipeline on the in-corpus questions and shape the results
     the way RAGAS expects: question, contexts, answer, and a reference."""
-    with open("eval/golden_qa.json") as f:
+    with open(ZEPHYR_GOLDEN_PATH) as f:
         golden = [g for g in json.load(f) if g["in_corpus"]]
 
     samples = []

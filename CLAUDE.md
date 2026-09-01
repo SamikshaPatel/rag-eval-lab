@@ -18,7 +18,7 @@ pip install -r requirements.txt
 # Pull required models: ollama pull llama3.1:8b && ollama pull nomic-embed-text
 
 # Run in order
-python3 src/ingest.py                        # Build vector store (run once, or after changing data/chunking)
+python3 src/ingest_zephyr.py                        # Build vector store (run once, or after changing data/chunking)
 python3 src/rag_chain.py "Your question"     # Test RAG pipeline
 python3 src/agent.py "Multi-step question"   # Test agent tool routing
 python3 src/eval_custom.py                   # Run hand-rolled eval harness
@@ -41,8 +41,8 @@ Seven modular scripts form a data-flow pipeline:
 ### Data Flow
 ```
 data/zephyr_handbook.md
-    → ingest.py (chunk + embed)
-    → chroma_db/ (persisted vector store)
+    → ingest_zephyr.py (chunk + embed)
+    → chroma_db_zephyr/ (persisted vector store)
     → rag_chain.py (retrieve + generate)
     → eval_custom.py / eval_ragas.py / eval_deepeval.py (evaluate)
     → eval_langsmith.py / run_golden_eval.py (LangSmith experiments)
@@ -55,7 +55,7 @@ data/zephyr_handbook.md
 
 **`src/judgeUtil.py`** — Shared judge utilities: `GeminiJudge` (DeepEvalBaseLLM wrapper for Gemini), `make_judge()` (returns Gemini or Ollama judge based on `USE_LOCAL_JUDGE`), `ABSTENTION_MARKERS`, and `abstained()`. Used by `eval_custom.py`, `eval_deepeval.py`, and `eval_langsmith.py` — no duplication.
 
-**`src/ingest.py`** — One-time ingestion: loads `data/zephyr_handbook.md`, splits into 400-char chunks (80-char overlap), embeds with `nomic-embed-text`, persists to `./chroma_db/`. Chunk size is a primary tuning knob—change `CHUNK_SIZE`/`CHUNK_OVERLAP` in `config.py` (single source of truth), then re-run this script.
+**`src/ingest_zephyr.py`** — One-time ingestion: loads `data/zephyr_handbook.md`, splits into 400-char chunks (80-char overlap), embeds with `nomic-embed-text`, persists to `./chroma_db_zephyr/`. Chunk size is a primary tuning knob—change `CHUNK_SIZE`/`CHUNK_OVERLAP` in `config.py` (single source of truth), then re-run this script.
 
 **`src/rag_chain.py`** — Core RAG pipeline. Exposes `answer_with_context(question, k)` returning both answer and retrieved contexts (required for eval). `k=3` retrieved chunks by default; temperature=0 for repeatability. Grounding prompt instructs the model to say "I don't know based on the handbook" for out-of-corpus questions.
 
@@ -67,13 +67,13 @@ data/zephyr_handbook.md
 
 **`src/eval_deepeval.py`** — DeepEval evaluation: same four metrics as RAGAS but pytest-style (each question is an `LLMTestCase`). Makes fewer LLM sub-calls per metric than RAGAS. Judge is `gemini-3.6-flash` by default; set `USE_LOCAL_JUDGE=1` to fall back to `llama3.1:8b` via `OllamaModel`. Baseline results (local judge): Contextual Precision 0.83, Answer Relevancy 0.83, Faithfulness 0.58, Contextual Recall 0.51.
 
-**`src/eval_langsmith.py`** — LangSmith experiment runner. Creates the `zephyr-golden-qa` dataset in LangSmith from `eval/golden_qa.json` (idempotent — skips if already exists), then runs all 8 questions as a named experiment, logging faithfulness, answer relevancy, and abstention scores per question via DeepEval. Each run creates a new experiment so scores can be compared across pipeline changes in the LangSmith UI. Uses Gemini judge by default; set `USE_LOCAL_JUDGE=1` for Ollama.
+**`src/eval_langsmith.py`** — LangSmith experiment runner. Creates the `zephyr-golden-qa` dataset in LangSmith from `eval/golden_qa_zephyr.json` (idempotent — skips if already exists), then runs all 8 questions as a named experiment, logging faithfulness, answer relevancy, and abstention scores per question via DeepEval. Each run creates a new experiment so scores can be compared across pipeline changes in the LangSmith UI. Uses Gemini judge by default; set `USE_LOCAL_JUDGE=1` for Ollama.
 
 **`src/run_golden_eval.py`** — Minimal golden-dataset runner for LangSmith's online evaluator. Runs all 8 questions through `answer_with_context` as a LangSmith experiment with no local judge — relies on LangSmith's configured Answer Relevancy online evaluator (set up in the UI) to score traces automatically. Use this when you want LangSmith to handle scoring rather than a local DeepEval/RAGAS judge.
 
 ### Golden Dataset
 
-`eval/golden_qa.json` — 8 QA pairs: 6 in-corpus, 2 out-of-corpus (abstention tests). Each entry has `question`, `reference`, `must_contain` keywords, and `in_corpus` flag.
+`eval/golden_qa_zephyr.json` — 8 QA pairs: 6 in-corpus, 2 out-of-corpus (abstention tests). Each entry has `question`, `reference`, `must_contain` keywords, and `in_corpus` flag.
 
 ## Critical Design Decisions
 

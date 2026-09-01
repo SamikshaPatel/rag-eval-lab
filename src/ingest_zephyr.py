@@ -9,8 +9,8 @@ Concepts you learn here, in the order they appear:
   3. EMBEDDINGS   — turning each chunk into a vector (a list of numbers)
   4. VECTOR STORE — saving those vectors so we can search them later
 
-Run this ONCE before anything else:  python src/ingest.py
-It writes a folder called ./chroma_db that the other scripts read from.
+Run this ONCE before anything else:  python src/ingest_zephyr.py
+It writes a folder called ./chroma_db_zephyr that the other scripts read from.
 """
 
 from langchain_community.document_loaders import TextLoader
@@ -18,15 +18,13 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_ollama import OllamaEmbeddings
 from langchain_chroma import Chroma
 
-from config import DB_PATH, EMBED_MODEL, CHUNK_SIZE, CHUNK_OVERLAP
-
-DATA_PATH = "data/zephyr_handbook.md"
+from config import ZEPHYR_DB_PATH, ZEPHYR_DATA_PATH, EMBED_MODEL, CHUNK_SIZE, CHUNK_OVERLAP
 
 # ---------------------------------------------------------------------------
 # 1. LOADING
 # What you learn: RAG starts with plain text. The loader is just plumbing.
 # ---------------------------------------------------------------------------
-docs = TextLoader(DATA_PATH).load()
+docs = TextLoader(ZEPHYR_DATA_PATH).load()
 print(f"Loaded {len(docs)} document(s), {len(docs[0].page_content)} characters.")
 
 # ---------------------------------------------------------------------------
@@ -63,7 +61,7 @@ embeddings = OllamaEmbeddings(model=EMBED_MODEL)
 vectorstore = Chroma.from_documents(
     documents=chunks,
     embedding=embeddings,
-    persist_directory=DB_PATH,   # saved to disk automatically in langchain-chroma
+    persist_directory=ZEPHYR_DB_PATH,   # saved to disk automatically in langchain-chroma
 )
-print(f"Embedded and stored {len(chunks)} chunks in {DB_PATH}.")
+print(f"Embedded and stored {len(chunks)} chunks in {ZEPHYR_DB_PATH}.")
 print("Ingestion complete. You can now run src/rag_chain.py")

@@ -37,6 +37,7 @@ from deepeval.evaluate.configs import AsyncConfig, DisplayConfig
 from config import (
     FAITHFULNESS_THRESHOLD, RELEVANCY_THRESHOLD,
     CONTEXTUAL_RECALL_THRESHOLD, CONTEXTUAL_PRECISION_THRESHOLD,
+    ZEPHYR_GOLDEN_PATH,
 )
 from judgeUtil import GeminiJudge, make_judge, abstained  # noqa: F401 (GeminiJudge re-exported for clarity)
 from rag_chain import answer_with_context
@@ -46,7 +47,7 @@ from rag_chain import answer_with_context
 # Main
 # ---------------------------------------------------------------------------
 def main():
-    with open("eval/golden_qa.json") as f:
+    with open(ZEPHYR_GOLDEN_PATH) as f:
         golden = json.load(f)
 
     judge = make_judge()

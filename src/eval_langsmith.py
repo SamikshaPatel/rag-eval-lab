@@ -117,13 +117,14 @@ from config import (
     BIAS_THRESHOLD, TOXICITY_THRESHOLD,
     CORRECTNESS_THRESHOLD, COMPLETENESS_THRESHOLD,
     PROMPT_JUDGE_CORRECTNESS, PROMPT_JUDGE_COMPLETENESS,
+    ZEPHYR_GOLDEN_PATH, ZEPHYR_DATASET_NAME,
     _load_prompt,
 )
 from judgeUtil import make_judge, abstained as _abstained
 from rag_chain import answer_with_context
 
-DATASET_NAME = "zephyr-golden-qa"
-GOLDEN_PATH  = "eval/golden_qa.json"
+DATASET_NAME = ZEPHYR_DATASET_NAME
+GOLDEN_PATH  = ZEPHYR_GOLDEN_PATH
 
 
 # ---------------------------------------------------------------------------

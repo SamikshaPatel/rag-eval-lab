@@ -16,24 +16,24 @@ test record (TR) maps to one RUNBOOK step and states:
 
 **Command:**
 ```bash
-python3 src/ingest.py
+python3 src/ingest_zephyr.py
 ```
 
 **Pass criteria:**
 - Exactly **9 chunks** reported
-- `chroma_db/` directory created with at least `chroma.sqlite3`
+- `chroma_db_zephyr/` directory created with at least `chroma.sqlite3`
 
 **Actual output (baseline):**
 ```
 Loaded 1 document(s), 2478 characters.
 Split into 9 chunks.
-Embedded and stored 9 chunks in ./chroma_db.
+Embedded and stored 9 chunks in ./chroma_db_zephyr.
 Ingestion complete. You can now run src/rag_chain.py
 ```
 
 **Verify:**
 ```bash
-ls chroma_db/    # must contain chroma.sqlite3 and a UUID folder
+ls chroma_db_zephyr/    # must contain chroma.sqlite3 and a UUID folder
 ```
 
 **Status: ✅ PASS**
@@ -307,7 +307,7 @@ needed for a complete answer sometimes span more than 3 chunks. Raising `k` in
 
 ## TR-08 — LangSmith UI: Dataset Upload (RUNBOOK Step 10)
 
-**Action:** Upload `eval/golden_qa.json` to LangSmith as a Dataset.
+**Action:** Upload `eval/golden_qa_zephyr.json` to LangSmith as a Dataset.
 See RUNBOOK Step 10 for exact UI steps (manual UI), or run `eval_langsmith.py`
 (TR-13) which creates the dataset programmatically.
 

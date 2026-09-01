@@ -14,13 +14,16 @@ No other .py file needs to change.
 
 from pathlib import Path
 
-# --- Storage -----------------------------------------------------------------
-DB_PATH = "./chroma_db"                        # Zephyr corpus vector store
+# --- Zephyr corpus -----------------------------------------------------------
+ZEPHYR_DB_PATH      = "./chroma_db_zephyr"
+ZEPHYR_DATA_PATH    = "data/zephyr_handbook.md"
+ZEPHYR_GOLDEN_PATH  = "eval/golden_qa_zephyr.json"
+ZEPHYR_DATASET_NAME = "zephyr-golden-qa"
 
 # --- Northstar corpus --------------------------------------------------------
-NORTHSTAR_DB_PATH     = "./chroma_db_northstar"
-NORTHSTAR_DATA_PATH   = "data/Northstar_Digital_Bank.docx"
-NORTHSTAR_GOLDEN_PATH = "eval/golden_qa_northstar.jsonl"
+NORTHSTAR_DB_PATH      = "./chroma_db_northstar"
+NORTHSTAR_DATA_PATH    = "data/Northstar_Digital_Bank.docx"
+NORTHSTAR_GOLDEN_PATH  = "eval/golden_qa_northstar.jsonl"
 NORTHSTAR_DATASET_NAME = "northstar-golden-qa"
 
 # --- Models ------------------------------------------------------------------

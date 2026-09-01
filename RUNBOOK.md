@@ -161,7 +161,7 @@ against. Run once; re-run only if you change the source data or chunk settings.
 
 **Action:**
 ```bash
-python3 src/ingest.py
+python3 src/ingest_zephyr.py
 ```
 
 **What happens inside:**
@@ -169,19 +169,19 @@ python3 src/ingest.py
    never seen in training, so all correct answers *must* come from retrieval
 2. Splits the document into 400-character chunks with 80-character overlap
 3. Embeds each chunk using `nomic-embed-text` via Ollama
-4. Saves the vector store to `./chroma_db/`
+4. Saves the vector store to `./chroma_db_zephyr/`
 
 **Expected output:**
 ```
 Loaded 1 document(s), 2478 characters.
 Split into 9 chunks.
-Embedded and stored 9 chunks in ./chroma_db.
+Embedded and stored 9 chunks in ./chroma_db_zephyr.
 Ingestion complete. You can now run src/rag_chain.py
 ```
 
 **Evaluate / Verify:**
 ```bash
-ls chroma_db/
+ls chroma_db_zephyr/
 # Must contain chroma.sqlite3 and at least one UUID-named folder
 ```
 
@@ -189,7 +189,7 @@ ls chroma_db/
 Check Steps 1 and 2.
 
 **Tuning experiment (try later):** Change `CHUNK_SIZE = 400` to `CHUNK_SIZE = 100`
-in `rag_chain.py` (single source of truth for chunk params), re-run `ingest.py`,
+in `rag_chain.py` (single source of truth for chunk params), re-run `ingest_zephyr.py`,
 then re-run `rag_chain.py` on the same question. Answer quality typically drops —
 this demonstrates chunk size as a tunable variable. Reset to 400 when done.
 
@@ -425,7 +425,7 @@ https://smith.langchain.com.
    - **Dataset type:** leave as default (key-value)
 5. Click **Create Dataset**
 6. On the dataset detail page, click **+ Add examples** → **Upload file**
-7. Upload the file `eval/golden_qa.jsonl` from your local machine
+7. Upload the file `eval/golden_qa_zephyr.jsonl` from your local machine
 8. In the field mapping step:
    - Set **Input** to `question`
    - Set **Output** (expected) to `reference`
@@ -724,7 +724,7 @@ context_recall: X.XX
 transfers to every AI system you will test in future.
 
 **Action:**
-Open `eval/golden_qa.json` and add at least three new entries:
+Open `eval/golden_qa_zephyr.json` and add at least three new entries:
 
 1. An **in-corpus** question about a fact in the handbook not yet tested
 2. A **multi-fact** question that requires two separate handbook sections to
@@ -755,16 +755,16 @@ metrics. An eval suite is only as good as its cases.
 | 2 | `ollama pull llama3.1:8b && ollama pull nomic-embed-text` | Terminal | Ollama running |
 | 3 | `pip install -r requirements.txt` | Terminal | Python 3.10+ |
 | 4 | Fill in `.env` | Text editor | Google + LangSmith accounts |
-| 5 | `python3 src/ingest.py` | Terminal | Ollama running |
-| 6 | `python3 src/rag_chain.py "..."` | Terminal | `chroma_db/` built |
-| 7 | `python3 src/agent.py "..."` | Terminal | `chroma_db/` built |
+| 5 | `python3 src/ingest_zephyr.py` | Terminal | Ollama running |
+| 6 | `python3 src/rag_chain.py "..."` | Terminal | `chroma_db_zephyr/` built |
+| 7 | `python3 src/agent.py "..."` | Terminal | `chroma_db_zephyr/` built |
 | 8 | `python3 src/eval_custom.py` | Terminal | Ollama + `GOOGLE_API_KEY` |
 | 9 | `USE_LOCAL_JUDGE=1 python3 src/eval_deepeval.py` | Terminal | Ollama |
-| 10 | Upload `eval/golden_qa.json` | LangSmith UI | `LANGSMITH_API_KEY` |
+| 10 | Upload `eval/golden_qa_zephyr.json` | LangSmith UI | `LANGSMITH_API_KEY` |
 | 11 | Create online evaluators | LangSmith UI | `LANGSMITH_API_KEY` + `GOOGLE_API_KEY` |
 | 12 | `python3 src/eval_deepeval.py` | Terminal | `GOOGLE_API_KEY` (quota needed) |
 | 13 | Compare experiments | LangSmith UI | Steps 9 + 12 done |
 | 14 | `USE_LOCAL_JUDGE=1 python3 src/eval_langsmith.py` | Terminal | Ollama + `LANGSMITH_API_KEY` |
 | 15 | `python3 src/run_golden_eval.py` | Terminal | Ollama + `LANGSMITH_API_KEY` + online evaluator active |
 | 16 | `python3 src/eval_ragas.py` (optional) | Terminal | `GOOGLE_API_KEY` |
-| 17 | Edit `eval/golden_qa.json` | Text editor | — |
+| 17 | Edit `eval/golden_qa_zephyr.json` | Text editor | — |

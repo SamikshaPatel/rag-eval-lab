@@ -31,7 +31,7 @@ from langsmith import traceable
 # All tunable parameters and _load_prompt live in config.py — the single
 # source of truth. Import everything from there; nothing is defined here.
 from config import (
-    DB_PATH, EMBED_MODEL, CHAT_MODEL, JUDGE_MODEL, LOCAL_JUDGE_MODEL,
+    ZEPHYR_DB_PATH, EMBED_MODEL, CHAT_MODEL, JUDGE_MODEL, LOCAL_JUDGE_MODEL,
     CHUNK_SIZE, CHUNK_OVERLAP, RETRIEVAL_K, TEMPERATURE, REPEATS,
     PROMPT_RAG_GROUNDING, PROMPT_JUDGE_FAITHFULNESS,
     PROMPT_JUDGE_CORRECTNESS, PROMPT_JUDGE_COMPLETENESS,
@@ -50,7 +50,7 @@ from config import (
 # ---------------------------------------------------------------------------
 def get_retriever(k: int = 3):
     embeddings = OllamaEmbeddings(model=EMBED_MODEL)
-    vectorstore = Chroma(persist_directory=DB_PATH, embedding_function=embeddings)
+    vectorstore = Chroma(persist_directory=ZEPHYR_DB_PATH, embedding_function=embeddings)
     return vectorstore.as_retriever(search_kwargs={"k": k})
 
 
