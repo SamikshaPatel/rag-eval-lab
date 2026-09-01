@@ -319,7 +319,8 @@ Each day links to a run report or comparison where one exists so you can see rea
    the agent answers pure arithmetic questions correctly but without calling
    the calculator tool. Correct answer, wrong path. That distinction is the
    core of agent QA.
-   *No HTML report — trace lives in the LangSmith UI; eval output is console.*
+   → Screenshot: [`docs/screenshots/5_agent_eval_terminal_output.png`](docs/screenshots/5_agent_eval_terminal_output.png) — `eval_agent.py` console output: per-question pass/fail and aggregate metrics
+   → Screenshot: [`docs/screenshots/5_agent_langsmith_multistep_trace.png`](docs/screenshots/5_agent_langsmith_multistep_trace.png) — LangSmith trace for the multi-step retention question showing non-deterministic tool routing
 
 5. **Day 5** — Run `eval_custom.py`. Read every metric's comment block. Set
    `REPEATS=3` and observe variance.
