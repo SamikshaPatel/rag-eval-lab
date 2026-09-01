@@ -42,9 +42,10 @@ rag-eval-lab/
 │   ├── eval_ragas.py            # RAGAS evaluation (faithfulness, relevancy, precision, recall)
 │   ├── eval_deepeval.py         # DeepEval evaluation (pytest-style, fewer LLM calls)
 │   ├── eval_langsmith.py        # LangSmith experiment runner — Zephyr (10 metrics)
-│   ├── eval_langsmith_northstar.py  # LangSmith experiment runner — Northstar (10 metrics)
-│   └── run_golden_eval.py       # Minimal runner for LangSmith online evaluator
-│
+│   ├── eval_langsmith_northstar.py  # LangSmith experiment runner — Northstar (10 metrics) 
+                                      Screenshot: docs/screenshots/3_langsmith_zephyr_experiment_Per-QuestionFeedbackScore.png     
+                                                   docs/screenshots/3_langsmith_northstar_experiment_Per-QuestionFeedbackScore.png  
+│   └── run_golden_eval.py       # Minimal runner for LangSmith online evaluator. Screenshot:  docs/screenshots/4_langsmith_online_evaluator_config.png
 ├── reports/                     # HTML eval reports per run + comparison reports
 │   ├── run1_eval_k3_chunk400_llama31_ollama.html
 │   ├── run2_eval_k3_chunk200_llama31_ollama.html
@@ -236,6 +237,7 @@ Read the files in this order. Each one is heavily commented with the "why".
 ## Northstar experiment log
 
 Each run changes one variable at a time. This table captures what was tried, what changed in the scores, and the root-cause explanation — the discipline of treating each experiment as a falsifiable hypothesis rather than a random tweak.
+Screenshot:  docs/screenshots/1_langsmith_northstar_experiment_comparison.png
 
 ### Run summary
 
@@ -279,6 +281,8 @@ Each day links to a run report or comparison where one exists so you can see rea
 2. **Day 2** — Run `rag_chain.py` with several questions. Then open the run in
    LangSmith and read the retrieve → prompt → generate trace.
    *No HTML report — trace lives in the LangSmith UI.*
+   → Screenshot: docs/screenshots/2_langsmith_zephyr_experiment_SingleTrace-RAGPipelineSteps.png
+   → Screenshot: docs/screenshots/2_langsmith_northstar_experiment_SingleTrace-RAGPipelineSteps.png
 
 3. **Day 3** — Break it on purpose: set `CHUNK_SIZE=100` in `config.py`,
    re-run `ingest_zephyr.py`, then re-ask. Watch quality drop. This is a controlled experiment.
@@ -309,6 +313,7 @@ Each day links to a run report or comparison where one exists so you can see rea
    (Answer Relevancy) on all 8 questions. Compare experiments side-by-side in
    the LangSmith UI — this is how you track score changes across code iterations.
    → *See [`reports/Zephyr_reports/run1_eval_k3_chunk400_llama31_ollama.html`](reports/Zephyr_reports/run1_eval_k3_chunk400_llama31_ollama.html) through [`run4_eval_k3_chunk400_qwen25_ollama.html`](reports/Zephyr_reports/run4_eval_k3_chunk400_qwen25_ollama.html) — four runs tracking score evolution across chunk-size and judge-model changes.*
+   → Screenshot: docs/screenshots/1_langsmith_zephyr_experiment_comparison.png
 
 9. **Day 9** — Edit a prompt in `prompts/` (e.g. tighten the grounding
    instruction), re-run `eval_langsmith.py`, and compare scores. You have now
@@ -318,7 +323,7 @@ Each day links to a run report or comparison where one exists so you can see rea
 10. **Day 10** — Add three of your own questions to `golden_qa.json`, including
     one more out-of-corpus trap. You have now authored an eval suite.
     *No report — the eval scripts will produce output on your new questions automatically.*
-
+    
 ---
 
 ## The mental shift to internalise
