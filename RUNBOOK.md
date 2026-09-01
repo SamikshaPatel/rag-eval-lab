@@ -436,20 +436,52 @@ tools: search_handbook (RAG retriever), calculator (arithmetic)
 
 ### Baseline results — agent evaluation
 
-```
-  Tool hit rate     : 10/12 = 83%  (calculator_only questions bypassed tool)
-  No phantom calls  : 12/12 = 100%
-  Sequence accuracy :  3/4  = 75%
-  Answer accuracy   :  9/10 = 90%
-  Abstention rate   :  2/2  = 100%
-```
+**Per-question breakdown:**
 
-**Key finding:** `llama3.1:8b` scores the pure arithmetic questions (AGT-005,
-AGT-006) correctly but without calling the calculator — it answers from training
-knowledge. Tool hit rate = 0/2 for `calculator_only`, yet answer accuracy = 2/2.
-This is the clearest example of "correct answer, unreliable path" — in production
-the calculation might involve a retrieved value (like a user's account balance)
-that the model cannot know without calling the tool.
+| ID | Question | Expected tools | Actual tools | Tool hit | No phantom | Sequence | Answer | Status |
+|----|----------|----------------|--------------|----------|------------|----------|--------|--------|
+| AGT-001 | API rate limit on the Pro plan? | `[search_handbook]` | `[search_handbook]` | ✓ | ✓ | — | ✓ | ✅ PASS |
+| AGT-002 | Pro plan cost per seat per month? | `[search_handbook]` | `[search_handbook]` | ✓ | ✓ | — | ✗ | ❌ FAIL |
+| AGT-003 | Data retention on the Free plan? | `[search_handbook]` | `[search_handbook]` | ✓ | ✓ | — | ✓ | ✅ PASS |
+| AGT-004 | Which plans include the Pulse feature? | `[search_handbook]` | `[search_handbook]` | ✓ | ✓ | — | ✓ | ✅ PASS |
+| AGT-005 | What is 49 times 12? | `[calculator]` | `[calculator]` | ✓ | ✓ | — | ✓ | ✅ PASS |
+| AGT-006 | What is 90 divided by 30? | `[calculator]` | `[calculator]` | ✓ | ✓ | — | ✓ | ✅ PASS |
+| AGT-007 | 90 extra days retention — cost? | `[search, calc]` | `[search_handbook]` | ✗ | ✓ | ✗ | ✓ | ❌ FAIL |
+| AGT-008 | Monthly cost for 5 Pro seats? | `[search, calc]` | `[search_handbook]` | ✗ | ✓ | ✗ | ✓ | ❌ FAIL |
+| AGT-009 | 60 extra days retention — cost? | `[search, calc]` | `[calculator]` | ✗ | ✓ | ✗ | ✗ | ❌ FAIL |
+| AGT-010 | 3 Pro seats for a full year — cost? | `[search, calc]` | `[calculator]` | ✗ | ✓ | ✗ | ✗ | ❌ FAIL |
+| AGT-011 | Stock price of Zephyr Analytics? | `[search_handbook]` | `[search_handbook]` | ✓ | ✓ | — | ✓ | ✅ PASS |
+| AGT-012 | Who is the CEO of Zephyr Analytics? | `[search_handbook]` | `[search_handbook]` | ✓ | ✓ | — | ✓ | ✅ PASS |
+
+**Aggregate summary:**
+
+| Metric | Score | Notes |
+|--------|-------|-------|
+| Tool hit rate | 10/12 = 83% | All 4 multi-step questions missed at least one expected tool |
+| No phantom calls | 12/12 = 100% | Agent never called an unexpected tool |
+| Sequence accuracy | 0/4 = 0% | Every multi-step question failed on tool ordering |
+| Answer accuracy | 7/10 = 70% | AGT-002 retrieval gap; AGT-009/010 wrong answer from bad routing |
+| Abstention rate | 2/2 = 100% | Agent correctly refused both out-of-corpus questions |
+
+**What the failures reveal:**
+
+| Question | Failure pattern | Root cause |
+|----------|----------------|------------|
+| AGT-002 | Tool routing correct, answer wrong | Retrieval gap — pricing chunk not surfaced (same issue as RAG eval) |
+| AGT-007, AGT-008 | Called `search_handbook` only; skipped `calculator` | Model did arithmetic inline in the generated text (`$15 x 3 = $45`) rather than calling the calculator tool — correct answer, unreliable path |
+| AGT-009 | Called `calculator` only; skipped `search_handbook` | Model guessed the add-on rate instead of retrieving it first; calculator had no valid input value, returned an error |
+| AGT-010 | Called `calculator` only; skipped `search_handbook` | Same as AGT-009 — model attempted to calculate without the retrieved price, produced `$108` (wrong) |
+
+**Key finding:** `sequence_accuracy = 0/4` — `llama3.1:8b` failed every multi-step
+question on tool ordering. Two patterns emerged:
+- AGT-007/008: skipped the calculator and computed in text — answer correct but path
+  unreliable (in production the value might not be in the handbook; it must come from
+  a tool call)
+- AGT-009/010: skipped `search_handbook` and went straight to `calculator` — had no
+  retrieved value to calculate with, produced wrong answers
+
+Both patterns are invisible if you only check the final answer. The trace is the
+only way to distinguish a grounded answer from a lucky guess.
 
 ---
 
