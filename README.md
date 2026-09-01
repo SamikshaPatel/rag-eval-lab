@@ -12,6 +12,12 @@ testing instincts transfer directly.
 
 ---
 
+> **Disclaimer**
+>
+> The evaluation scores in this project reflect the capabilities and limitations of the open-source models used — `llama3.1:8b` for generation and `qwen2.5:7b` as the local judge. These are capable models for a fully local, free stack, but they produce lower absolute scores than commercial models such as GPT-4 or Claude. **The goal of this project is not to maximise scores — it is to demonstrate how to build, instrument, and iteratively improve a RAG evaluation pipeline.** The methodology (metric selection, experiment tracking, root-cause analysis, prompt versioning, retrieval tuning) is what transfers to production systems, regardless of which model runs underneath. Scores should be interpreted as relative signals across experiments, not as benchmarks against commercial RAG systems.
+
+---
+
 ## Project layout
 
 ```
