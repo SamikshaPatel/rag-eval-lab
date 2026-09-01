@@ -30,16 +30,18 @@ from langchain_chroma import Chroma
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 
-TARGET_IDS = {"NSB-023", "NSB-024", "NSB-033"}
+TARGET_IDS = {"NSB-023", "NSB-024", "NSB-033", "NSB-034"}
 
 # Multi-query retrieval for role disambiguation (mirrors eval_langsmith_northstar.py)
 _ROLE_TERMS = {"viewer", "user", "administrator", "admin"}
+_ROLE_COMPARE_TERMS = {"difference", "compare", "versus", "vs", "differ"}
 
 
 def _get_contexts(question: str, retriever, k: int) -> list:
     q_lower = question.lower()
     mentioned_roles = [r for r in _ROLE_TERMS if r in q_lower]
-    if len(mentioned_roles) >= 2:
+    is_role_comparison = len(mentioned_roles) >= 2 and any(t in q_lower for t in _ROLE_COMPARE_TERMS)
+    if is_role_comparison:
         seen, combined = set(), []
         for role in mentioned_roles:
             for doc in retriever.invoke(f"{role} role definition access"):
@@ -57,6 +59,7 @@ def _heuristic_pass(qid: str, answer: str) -> bool:
         "NSB-023": "dual approval" in a and ("always" in a or "regardless" in a or "every" in a or "no" in a),
         "NSB-024": "10,000" in answer or "10000" in answer,
         "NSB-033": "read-only" in a and "viewer" in a and "user" in a,
+        "NSB-034": "five minutes" in a or "5 minutes" in a,
     }.get(qid, False)
 
 
@@ -98,7 +101,8 @@ def main():
         print(f"  Expected : {expected}")
         print(f"  Actual   : {answer.strip()}")
         q_lower = question.lower()
-        if sum(1 for r in _ROLE_TERMS if r in q_lower) >= 2:
+        mentioned = [r for r in _ROLE_TERMS if r in q_lower]
+        if len(mentioned) >= 2 and any(t in q_lower for t in _ROLE_COMPARE_TERMS):
             print(f"  (multi-query retrieval: separate query per role)")
         print(f"\n  Retrieved contexts ({len(contexts)}):")
         for i, c in enumerate(contexts, 1):

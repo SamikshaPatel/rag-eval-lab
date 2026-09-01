@@ -132,15 +132,21 @@ _vectorstore = Chroma(persist_directory=NORTHSTAR_DB_PATH, embedding_function=_e
 # guaranteeing each role's definition chunk is included in the context.
 # ---------------------------------------------------------------------------
 _ROLE_TERMS = {"viewer", "user", "administrator", "admin"}
+# Multi-query only fires for questions that are explicitly comparing roles,
+# not every question that happens to mention a role name in context.
+_ROLE_COMPARE_TERMS = {"difference", "compare", "versus", "vs", "differ"}
 
 
 def _get_contexts(question: str, k: int = RETRIEVAL_K) -> list:
     retriever = _vectorstore.as_retriever(search_kwargs={"k": k})
     q_lower = question.lower()
     mentioned_roles = [r for r in _ROLE_TERMS if r in q_lower]
+    is_role_comparison = len(mentioned_roles) >= 2 and any(t in q_lower for t in _ROLE_COMPARE_TERMS)
 
-    if len(mentioned_roles) >= 2:
-        # Separate retrieval per role to guarantee each role's definition is fetched
+    if is_role_comparison:
+        # Separate retrieval per role to guarantee each role's definition is fetched.
+        # Only triggered for explicit role comparison questions (e.g. "difference between
+        # Viewer and User"), not questions that incidentally mention role names.
         seen, combined = set(), []
         for role in mentioned_roles:
             for doc in retriever.invoke(f"{role} role definition access"):
