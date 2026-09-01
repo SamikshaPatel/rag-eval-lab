@@ -68,7 +68,8 @@ def make_judge():
 # ---------------------------------------------------------------------------
 ABSTENTION_MARKERS = [
     "don't know", "do not know", "not in", "no information",
-    "cannot", "can't", "not contain", "not available",
+    "cannot", "can't", "not contain", "not available", "unable to find",
+    "unable to locate", "i was unable", "couldn't find",
 ]
 
 
