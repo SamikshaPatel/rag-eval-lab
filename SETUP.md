@@ -22,7 +22,7 @@ ollama pull nomic-embed-text   # the embedding model (~275 MB)
 ```
 
 Low on RAM? Swap `llama3.1:8b` for a smaller model like `qwen2.5:3b` in
-`src/rag_chain.py` (the `CHAT_MODEL` constant). Smaller models are worse at
+`src/config.py` (the `CHAT_MODEL` constant). Smaller models are worse at
 tool-calling — which, for the agent step, is itself interesting to observe.
 
 ## 3. Python environment
@@ -66,13 +66,20 @@ Experiments comparison UI. Steps 10-13 in RUNBOOK.md cover the LangSmith eval wo
 ## 5. Run the project in order
 
 ```bash
-python3 src/ingest.py                 # build the vector store (run once)
+# Zephyr corpus (fictional analytics handbook — run first)
+python3 src/ingest_zephyr.py          # build the Zephyr vector store (run once)
 python3 src/rag_chain.py "How much is the Pro plan?"   # try RAG
-python3 src/agent.py                  # watch the agent route between tools
+python3 src/agent.py "How much extra would 90-day retention cost for 500 users?"  # watch the agent route between tools
+
+# Evaluation (Zephyr)
 python3 src/eval_custom.py            # your hand-built eval harness
 python3 src/eval_ragas.py             # RAGAS library eval
 USE_LOCAL_JUDGE=1 python3 src/eval_deepeval.py   # DeepEval (local judge, no quota)
 python3 src/eval_deepeval.py          # DeepEval with Gemini judge (requires quota)
+
+# Northstar corpus (fictional banking handbook — optional second corpus)
+python3 src/ingest_northstar.py       # build the Northstar vector store (run once)
+USE_LOCAL_JUDGE=1 python3 src/eval_langsmith_northstar.py  # run 44-question Northstar eval
 ```
 
 **Rate limit tip:** All three eval scripts share the same Gemini free-tier
