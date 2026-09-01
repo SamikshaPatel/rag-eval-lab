@@ -33,8 +33,13 @@ JUDGE_MODEL       = "gemini-3.6-flash"   # cloud judge (default; 20 req/day free
 LOCAL_JUDGE_MODEL = "qwen2.5:7b"         # local fallback judge (USE_LOCAL_JUDGE=1)
 
 # --- Chunking ----------------------------------------------------------------
-CHUNK_SIZE    = 400   # chars per chunk — re-run ingest.py after changing
+# Zephyr corpus
+CHUNK_SIZE    = 400   # chars per chunk — re-run ingest_zephyr.py after changing
 CHUNK_OVERLAP = 80    # overlap between chunks
+
+# Northstar corpus (tuned separately so Zephyr baseline is preserved)
+NORTHSTAR_CHUNK_SIZE    = 200
+NORTHSTAR_CHUNK_OVERLAP = 40
 
 # --- Retrieval & generation --------------------------------------------------
 RETRIEVAL_K = 3     # chunks fetched per query

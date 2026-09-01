@@ -97,7 +97,7 @@ def _safe_evaluate(key: str, question: str, fn):
 sys.path.insert(0, os.path.dirname(__file__))
 from config import (
     JUDGE_MODEL, LOCAL_JUDGE_MODEL,
-    CHAT_MODEL, EMBED_MODEL, CHUNK_SIZE, CHUNK_OVERLAP,
+    CHAT_MODEL, EMBED_MODEL, NORTHSTAR_CHUNK_SIZE, NORTHSTAR_CHUNK_OVERLAP,
     RETRIEVAL_K, TEMPERATURE,
     FAITHFULNESS_THRESHOLD, RELEVANCY_THRESHOLD,
     CONTEXTUAL_PRECISION_THRESHOLD, CONTEXTUAL_RECALL_THRESHOLD,
@@ -222,7 +222,7 @@ def _build_case(run, example) -> LLMTestCase:
 def make_faithfulness_evaluator(judge):
     def _eval(run, example):
         if not example.inputs.get("in_corpus", True):
-            return {"key": "de_faithfulness", "score": None, "comment": "skipped — ood"}
+            return {"key": "de_faithfulness", "score": None, "value": "N/A", "comment": "skipped — ood"}
         q = example.inputs.get("question", "?")
         def _run():
             m = FaithfulnessMetric(threshold=FAITHFULNESS_THRESHOLD, model=judge, verbose_mode=False)
@@ -235,7 +235,7 @@ def make_faithfulness_evaluator(judge):
 def make_relevancy_evaluator(judge):
     def _eval(run, example):
         if not example.inputs.get("in_corpus", True):
-            return {"key": "de_answer_relevancy", "score": None, "comment": "skipped — ood"}
+            return {"key": "de_answer_relevancy", "score": None, "value": "N/A", "comment": "skipped — ood"}
         q = example.inputs.get("question", "?")
         def _run():
             m = AnswerRelevancyMetric(threshold=RELEVANCY_THRESHOLD, model=judge, verbose_mode=False)
@@ -248,7 +248,7 @@ def make_relevancy_evaluator(judge):
 def make_contextual_precision_evaluator(judge):
     def _eval(run, example):
         if not example.inputs.get("in_corpus", True):
-            return {"key": "de_contextual_precision", "score": None, "comment": "skipped — ood"}
+            return {"key": "de_contextual_precision", "score": None, "value": "N/A", "comment": "skipped — ood"}
         q = example.inputs.get("question", "?")
         def _run():
             m = ContextualPrecisionMetric(threshold=CONTEXTUAL_PRECISION_THRESHOLD, model=judge, verbose_mode=False)
@@ -261,7 +261,7 @@ def make_contextual_precision_evaluator(judge):
 def make_contextual_recall_evaluator(judge):
     def _eval(run, example):
         if not example.inputs.get("in_corpus", True):
-            return {"key": "de_contextual_recall", "score": None, "comment": "skipped — ood"}
+            return {"key": "de_contextual_recall", "score": None, "value": "N/A", "comment": "skipped — ood"}
         q = example.inputs.get("question", "?")
         def _run():
             m = ContextualRecallMetric(threshold=CONTEXTUAL_RECALL_THRESHOLD, model=judge, verbose_mode=False)
@@ -274,7 +274,7 @@ def make_contextual_recall_evaluator(judge):
 def make_contextual_relevancy_evaluator(judge):
     def _eval(run, example):
         if not example.inputs.get("in_corpus", True):
-            return {"key": "de_contextual_relevancy", "score": None, "comment": "skipped — ood"}
+            return {"key": "de_contextual_relevancy", "score": None, "value": "N/A", "comment": "skipped — ood"}
         q = example.inputs.get("question", "?")
         def _run():
             m = ContextualRelevancyMetric(threshold=CONTEXTUAL_RELEVANCY_THRESHOLD, model=judge, verbose_mode=False)
@@ -287,7 +287,7 @@ def make_contextual_relevancy_evaluator(judge):
 def make_hallucination_evaluator(judge):
     def _eval(run, example):
         if not example.inputs.get("in_corpus", True):
-            return {"key": "de_hallucination", "score": None, "comment": "skipped — ood"}
+            return {"key": "de_hallucination", "score": None, "value": "N/A", "comment": "skipped — ood"}
         q = example.inputs.get("question", "?")
         def _run():
             m = HallucinationMetric(threshold=HALLUCINATION_THRESHOLD, model=judge, verbose_mode=False)
@@ -342,7 +342,7 @@ _COMPLETENESS_PROMPT = _load_prompt(PROMPT_JUDGE_COMPLETENESS)
 def make_correctness_evaluator(judge):
     def _eval(run, example):
         if not example.inputs.get("in_corpus", True):
-            return {"key": "de_answer_correctness", "score": None, "comment": "skipped — ood"}
+            return {"key": "de_answer_correctness", "score": None, "value": "N/A", "comment": "skipped — ood"}
         q = example.inputs["question"]
         def _run():
             prompt = _CORRECTNESS_PROMPT.format(
@@ -360,7 +360,7 @@ def make_correctness_evaluator(judge):
 def make_completeness_evaluator(judge):
     def _eval(run, example):
         if not example.inputs.get("in_corpus", True):
-            return {"key": "de_answer_completeness", "score": None, "comment": "skipped — ood"}
+            return {"key": "de_answer_completeness", "score": None, "value": "N/A", "comment": "skipped — ood"}
         q = example.inputs["question"]
         def _run():
             prompt = _COMPLETENESS_PROMPT.format(
@@ -377,7 +377,7 @@ def make_completeness_evaluator(judge):
 
 def de_abstention_evaluator(run, example) -> dict:
     if example.inputs.get("in_corpus", True):
-        return {"key": "de_abstention", "score": None, "comment": "skipped — in-corpus"}
+        return {"key": "de_abstention", "score": None, "value": "N/A", "comment": "skipped — in-corpus"}
     answer = run.outputs["answer"].lower()
     passed = _abstained(answer)
     return {"key": "de_abstention", "score": 1.0 if passed else 0.0}
@@ -398,7 +398,7 @@ def main():
     experiment_prefix = (
         f"northstar"
         f"-k{RETRIEVAL_K}"
-        f"-chunk{CHUNK_SIZE}o{CHUNK_OVERLAP}"
+        f"-chunk{NORTHSTAR_CHUNK_SIZE}o{NORTHSTAR_CHUNK_OVERLAP}"
         f"-{chat_label}"
         f"-judge-{judge_label}"
     )
@@ -406,8 +406,8 @@ def main():
     experiment_metadata = {
         "corpus":           "northstar",
         "retrieval_k":      RETRIEVAL_K,
-        "chunk_size":       CHUNK_SIZE,
-        "chunk_overlap":    CHUNK_OVERLAP,
+        "chunk_size":       NORTHSTAR_CHUNK_SIZE,
+        "chunk_overlap":    NORTHSTAR_CHUNK_OVERLAP,
         "embed_model":      EMBED_MODEL,
         "chat_model":       CHAT_MODEL,
         "temperature":      TEMPERATURE,

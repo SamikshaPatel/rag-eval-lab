@@ -16,7 +16,7 @@ from langchain_ollama import OllamaEmbeddings
 from langchain_chroma import Chroma
 
 from config import (
-    EMBED_MODEL, CHUNK_SIZE, CHUNK_OVERLAP,
+    EMBED_MODEL, NORTHSTAR_CHUNK_SIZE, NORTHSTAR_CHUNK_OVERLAP,
     NORTHSTAR_DB_PATH, NORTHSTAR_DATA_PATH,
 )
 
@@ -36,11 +36,11 @@ def main():
     raw_doc = LCDocument(page_content=text, metadata={"source": NORTHSTAR_DATA_PATH})
 
     splitter = RecursiveCharacterTextSplitter(
-        chunk_size=CHUNK_SIZE,
-        chunk_overlap=CHUNK_OVERLAP,
+        chunk_size=NORTHSTAR_CHUNK_SIZE,
+        chunk_overlap=NORTHSTAR_CHUNK_OVERLAP,
     )
     chunks = splitter.split_documents([raw_doc])
-    print(f"  Split into {len(chunks)} chunks (size={CHUNK_SIZE}, overlap={CHUNK_OVERLAP}).")
+    print(f"  Split into {len(chunks)} chunks (size={NORTHSTAR_CHUNK_SIZE}, overlap={NORTHSTAR_CHUNK_OVERLAP}).")
 
     print(f"Embedding with {EMBED_MODEL} and persisting to {NORTHSTAR_DB_PATH} ...")
     embeddings = OllamaEmbeddings(model=EMBED_MODEL)
